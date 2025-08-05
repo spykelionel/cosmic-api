@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  email              String   @unique
+  phoneNumber        String?  @unique
+  occupation         String?
+  country            String?
+  socialMediaHandles String[]
+  fullName           String?
+  name               String
+  password           String
+  refreshToken       String?
+  avatar             String?  @default("https://aui.atlassian.com/aui/9.3/docs/images/avatar-person.svg")
+  isUserBan          Boolean  @default(false)
+  isAdmin            Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  // progress      UserProgress[]
+  // channels       Channel[]
+}
