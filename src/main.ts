@@ -15,7 +15,7 @@ async function bootstrap() {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+    origin: ['*'],
     credentials: true,
   });
 
@@ -26,17 +26,6 @@ async function bootstrap() {
     .setDescription('COSMIC STORE: API Documentation')
     .setVersion('1.0')
     .addBearerAuth()
-    .addTag('Authentication', 'User authentication and authorization')
-    .addTag('Products', 'Product management and operations')
-    .addTag('Cart', 'Shopping cart operations')
-    .addTag('Orders', 'Order management and processing')
-    .addTag('Users', 'User profile and management')
-    .addTag('Reviews', 'Product reviews and ratings')
-    .addTag('Wishlist', 'User wishlist management')
-    .addTag('Admin', 'Administrative operations')
-    .addTag('Payments', 'Stripe payment processing')
-    .addTag('Payment Methods', 'Payment method management')
-    .addTag('Upload', 'File upload operations')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -45,6 +34,6 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`Swagger documentation: http://localhost:${port}/api`);
+  console.log(`Swagger documentation: http://localhost:${port}/swagger`);
 }
 bootstrap();
