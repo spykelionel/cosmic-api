@@ -1,67 +1,73 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { OWNERSHIP_KEY } from '../decorators/ownership.decorator';
+
+export interface OwnershipConfig {
+  model: string;
+  idParam: string;
+  userIdField: string;
+  allowAdmin?: boolean;
+  allowVendor?: boolean;
+}
 
 @Injectable()
 export class OwnershipGuard implements CanActivate {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly reflector: Reflector,
+    private reflector: Reflector,
+    private prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const user = request.user;
-    const resourceId = request.params.id;
-
-    const resourceType = this.reflector.get<string>(
-      'resourceType',
-      context.getHandler(),
+    const ownershipConfig = this.reflector.getAllAndOverride<OwnershipConfig>(
+      OWNERSHIP_KEY,
+      [context.getHandler(), context.getClass()],
     );
-    if (!resourceType) {
+
+    if (!ownershipConfig) {
       return true;
     }
 
-    let resource;
-    switch (resourceType) {
-      case 'user':
-        resource = await this.prisma.user.findUnique({
+    const request = context.switchToHttp().getRequest();
+    const { user, params } = request;
+
+    if (!user) {
+      return false;
+    }
+
+    // Allow admins to access everything
+    if (ownershipConfig.allowAdmin && user.isAdmin) {
+      return true;
+    }
+
+    // Allow vendors to access their own resources
+    if (ownershipConfig.allowVendor && user.isVendor) {
+      const resourceId = params[ownershipConfig.idParam];
+      if (resourceId) {
+        const resource = await this.prisma[ownershipConfig.model].findUnique({
           where: { id: resourceId },
+          select: { [ownershipConfig.userIdField]: true },
         });
-        if (!resource && user?.isAdmin) {
-          resource = true;
+
+        if (resource && resource[ownershipConfig.userIdField] === user.id) {
+          return true;
         }
-        break;
-      case 'channel':
-        resource = await this.prisma.channel.findUnique({
-          where: { id: resourceId },
-        });
-        break;
-      case 'lesson':
-        resource = await this.prisma.lesson.findUnique({
-          where: { id: resourceId },
-        });
-        break;
-      case 'quiz':
-        resource = await this.prisma.quiz.findUnique({
-          where: { id: resourceId },
-        });
-        break;
-      default:
-        throw new ForbiddenException('Unknown resource type');
+      }
     }
 
-    if (!resource) {
-      throw new ForbiddenException(
-        "Resource doesn't exist or You do not have permission to modify this resource",
-      );
+    // Check if user owns the resource
+    const resourceId = params[ownershipConfig.idParam];
+    if (resourceId) {
+      const resource = await this.prisma[ownershipConfig.model].findUnique({
+        where: { id: resourceId },
+        select: { [ownershipConfig.userIdField]: true },
+      });
+
+      if (resource && resource[ownershipConfig.userIdField] === user.id) {
+        return true;
+      }
     }
 
-    return true;
+    throw new ForbiddenException('You do not have permission to access this resource');
   }
 }

@@ -2,20 +2,18 @@ import {
   ForbiddenException,
   Injectable,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { LoginDTO, RegisterDTO } from './dto';
-// import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from 'argon2';
-// import { httpErrorException } from '../../core/services/utility.service';
-// import { EventEmitter2 } from '@nestjs/event-emitter';
 import { httpErrorException } from 'src/core/services/utility.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { UserRole } from '../admin/dto';
 
 @Injectable()
 export class AuthService {
-  jwtService: any;
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
@@ -23,286 +21,364 @@ export class AuthService {
   ) {}
 
   async register(userData: RegisterDTO): Promise<any> {
-    const passwordHash = await hash(userData.password);
+    // Validate password strength
+    this.validatePasswordStrength(userData.password);
 
-    const findUser = await this.prisma.user.findUnique({
+    // Check if email already exists
+    const existingUser = await this.prisma.user.findUnique({
       where: { email: userData.email },
     });
 
-    console.log(findUser);
-
-    if (findUser) {
-      throw new ForbiddenException('Email already registered, try login in.');
+    if (existingUser) {
+      throw new ForbiddenException('Email already registered, try logging in.');
     }
 
-    if (userData.name.length > 20) {
-      throw new ForbiddenException('Name can not be more than 20 characters');
+    // Validate name length
+    if (userData.name.length > 50) {
+      throw new ForbiddenException('Name cannot be more than 50 characters');
+    }
+
+    if (userData.name.length < 2) {
+      throw new ForbiddenException('Name must be at least 2 characters');
     }
 
     try {
-      let user = await this.prisma.user.create({
+      // Hash password with better security
+      const passwordHash = await hash(userData.password, {
+        type: 2, // Argon2id
+        memoryCost: 2 ** 16, // 64 MB
+        timeCost: 3,
+        parallelism: 1,
+      });
+
+      // Create user with default role
+      const user = await this.prisma.user.create({
         data: {
           name: userData.name,
           email: userData.email,
           password: passwordHash,
           isAdmin: false,
+          isVendor: false,
+          isUserBan: false,
+          avatar: 'https://aui.atlassian.com/aui/9.3/docs/images/avatar-person.svg',
         },
       });
-      console.log('Creating ', user);
-      delete user.password;
-      delete user.isAdmin;
-      delete user.refreshToken;
-      const login = await this.login({
-        email: userData.email,
-        password: userData.password,
-      });
-      user = { ...user, ...login };
 
-      // Send a success email to the user
-      // await this.mailerService.sendMail({
-      //   to: user.email,
-      //   subject: 'Welcome to Naiya',
-      //   html: welcomeHtml('Naiya Admin', user.name),
-      // });
-      return user;
+      // Remove sensitive data
+      const { password, ...userWithoutPassword } = user;
+
+      // Generate tokens
+      const tokens = await this.generateTokens(userWithoutPassword);
+
+      // Update refresh token in database
+      await this.updateRefreshToken(user.id, tokens.refresh_token);
+
+      return {
+        user: userWithoutPassword,
+        ...tokens,
+        message: 'User registered successfully',
+      };
     } catch (error) {
-      console.log(error);
-      httpErrorException(error);
+      console.error('Registration error:', error);
+      throw httpErrorException(error);
     }
   }
 
-  generateRandomPassword(length: number) {
-    const uppercaseChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lowercaseChars = 'abcdefghijklmnopqrstuvwxyz';
-    const numberChars = '0123456789';
-    const specialChars = '!@#$%^&*()-=_+[]{}|;:,.<>?';
+  async login(loginData: LoginDTO, passwordlessLogin?: boolean): Promise<any> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { email: loginData.email },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          password: true,
+          isAdmin: true,
+          isVendor: true,
+          isUserBan: true,
+          avatar: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
 
-    const allChars =
-      uppercaseChars + lowercaseChars + numberChars + specialChars;
+      if (!user) {
+        throw new UnauthorizedException('Invalid email or password');
+      }
 
-    let password = '';
+      if (user.isUserBan) {
+        throw new ForbiddenException('Your account has been banned. Please contact support.');
+      }
 
-    for (let i = 0; i < length; i++) {
-      const randomIndex = Math.floor(Math.random() * allChars.length);
-      password += allChars.charAt(randomIndex);
+      // Check if user is trying to access admin area
+      if (user.isAdmin === true && !passwordlessLogin) {
+        throw new ForbiddenException('You are not allowed to login here');
+      }
+
+      // Verify password (unless passwordless login)
+      if (!passwordlessLogin) {
+        const isPasswordValid = await verify(user.password, loginData.password);
+        if (!isPasswordValid) {
+          throw new UnauthorizedException('Invalid email or password');
+        }
+      }
+
+      // Generate tokens
+      const tokens = await this.generateTokens(user);
+
+      // Update refresh token
+      await this.updateRefreshToken(user.id, tokens.refresh_token);
+
+      // Get user roles
+      const roles = this.getUserRoles(user);
+
+      return {
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatar: user.avatar,
+          roles,
+          isAdmin: user.isAdmin,
+          isVendor: user.isVendor,
+        },
+        message: 'Login successful',
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Login failed. Please try again.');
     }
-
-    return password;
   }
 
   async generateTokens(user: any): Promise<any> {
-    delete user.password;
-    delete user.isAdmin;
-    delete user.updatedAt;
-    delete user.refreshToken;
-    const signToken = await this.jwt.signAsync(user, {
-      expiresIn: '24h',
-      secret: this.config.get('JWT_SECRET'),
-    });
-    const refreshToken = await this.jwt.signAsync(user, {
-      expiresIn: '2days',
-      secret: this.config.get('JWT_RefreshSecret'),
-    });
+    const payload = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      isAdmin: user.isAdmin,
+      isVendor: user.isVendor,
+    };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwt.signAsync(payload, {
+        expiresIn: this.config.get('JWT_EXPIRES_IN', '15m'), // Shorter access token
+        secret: this.config.get('JWT_SECRET'),
+      }),
+      this.jwt.signAsync(payload, {
+        expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'), // Longer refresh token
+        secret: this.config.get('JWT_RefreshSecret'),
+      }),
+    ]);
+
     return {
-      access_token: signToken,
+      access_token: accessToken,
       refresh_token: refreshToken,
     };
   }
 
-  async login(loginData: LoginDTO, passwordlessLogin?: boolean) {
-    let user: any;
-    try {
-      user = await this.prisma.user.findUnique({
-        where: { email: loginData.email },
-      });
-    } catch (error) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    if (user?.isAdmin === true) {
-      throw new ForbiddenException('You are not allowed to login here');
-    }
-
-    let isFavorite = false; // Initialize isFavorite as false
-
-    if (user) {
-      const password = await verify(user?.password, loginData.password);
-
-      if (password || passwordlessLogin) {
-        // Check if the user has a list of favorite ad IDs
-        isFavorite =
-          Array.isArray(user?.itFavorite) && user?.itFavorite.length > 0;
-
-        const tokens = await this.generateTokens(user);
-        await this.updateRefreshToken(user?.id, tokens.refresh_token);
-
-        return {
-          ...tokens,
-          isFavorite,
-          userName: user?.name,
-          userId: user?.id,
-        };
-      } else {
-        throw new ForbiddenException('Incorrect Password');
-      }
-    } else {
-      throw new ForbiddenException('User Not found');
-    }
-  }
-
-  async updateRefreshToken(userId: string, refreshToken: string) {
-    const refreshTokenHash = await hash(refreshToken);
-
-    await this.prisma.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        refreshToken: refreshTokenHash,
-      },
-    });
-  }
-
   async refreshToken(refreshToken: string): Promise<any> {
-    let userDetails: any;
     try {
-      userDetails = await this.jwt.verifyAsync<any>(refreshToken, {
-        secret: process.env.JWT_RefreshSecret,
+      // Verify refresh token
+      const payload = await this.jwt.verifyAsync(refreshToken, {
+        secret: this.config.get('JWT_RefreshSecret'),
       });
-    } catch {
-      httpErrorException('Your login session has timed out. Login again');
+
+      // Get fresh user data
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.id },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          isAdmin: true,
+          isVendor: true,
+          isUserBan: true,
+          avatar: true,
+        },
+      });
+
+      if (!user || user.isUserBan) {
+        throw new UnauthorizedException('User not found or banned');
+      }
+
+      // Generate new tokens
+      const tokens = await this.generateTokens(user);
+
+      // Update refresh token
+      await this.updateRefreshToken(user.id, tokens.refresh_token);
+
+      return {
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatar: user.avatar,
+          roles: this.getUserRoles(user),
+        },
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid refresh token');
     }
-    const user: any = await this.prisma.user.findUnique({
-      where: {
-        id: userDetails.id,
-      },
-    });
-
-    if (!user.refreshToken) throw new ForbiddenException('Access Denied');
-
-    const tokens = await this.generateTokens(user);
-    await this.updateRefreshToken(user.id, tokens.refresh_token);
-    return tokens;
   }
 
-  async adminLogin(loginData: LoginDTO) {
+  async logout(userId: string): Promise<any> {
+    try {
+      // Clear refresh token
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { refreshToken: null },
+      });
+
+      return { message: 'Logout successful' };
+    } catch (error) {
+      throw new BadRequestException('Logout failed');
+    }
+  }
+
+  async updateRefreshToken(userId: string, refreshToken: string): Promise<void> {
+    const refreshTokenHash = await hash(refreshToken);
+    
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: refreshTokenHash },
+    });
+  }
+
+  private validatePasswordStrength(password: string): void {
+    if (password.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters long');
+    }
+
+    if (!/(?=.*[a-z])/.test(password)) {
+      throw new BadRequestException('Password must contain at least one lowercase letter');
+    }
+
+    if (!/(?=.*[A-Z])/.test(password)) {
+      throw new BadRequestException('Password must contain at least one uppercase letter');
+    }
+
+    if (!/(?=.*\d)/.test(password)) {
+      throw new BadRequestException('Password must contain at least one number');
+    }
+
+    if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(password)) {
+      throw new BadRequestException('Password must contain at least one special character');
+    }
+  }
+
+  private getUserRoles(user: any): string[] {
+    const roles = [];
+    
+    if (user.isAdmin) {
+      roles.push('admin');
+    }
+    
+    if (user.isVendor) {
+      roles.push('vendor');
+    }
+    
+    if (!user.isAdmin && !user.isVendor) {
+      roles.push('user');
+    }
+    
+    return roles;
+  }
+
+  // Additional security methods
+  async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<any> {
     const user = await this.prisma.user.findUnique({
-      where: { email: loginData.email },
+      where: { id: userId },
+      select: { password: true },
     });
 
     if (!user) {
-      throw new ForbiddenException('User Not found or not an admin');
+      throw new UnauthorizedException('User not found');
     }
 
-    if (user.isAdmin === true) {
-      const password = await verify(user.password, loginData.password);
-
-      if (password) {
-        delete user.password;
-        const signToken = await this.jwt.signAsync(user, {
-          expiresIn: '2h',
-          secret: this.config.get('JWT_SECRET'),
-        });
-        return {
-          access_token: signToken,
-        };
-      } else {
-        throw new ForbiddenException('Incorrect Password');
-      }
-    } else {
-      throw new ForbiddenException('User Not found or not an admin');
+    // Verify old password
+    const isOldPasswordValid = await verify(user.password, oldPassword);
+    if (!isOldPasswordValid) {
+      throw new BadRequestException('Current password is incorrect');
     }
-  }
 
-  async registerAdmin(userData: RegisterDTO) {
-    userData['isAdmin'] = true;
-    let res: any;
-    await this.register(userData).then((r) => {
-      res = r;
+    // Validate new password
+    this.validatePasswordStrength(newPassword);
+
+    // Hash new password
+    const newPasswordHash = await hash(newPassword, {
+      type: 2,
+      memoryCost: 2 ** 16,
+      timeCost: 3,
+      parallelism: 1,
     });
-    return res;
+
+    // Update password
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: newPasswordHash },
+    });
+
+    return { message: 'Password changed successfully' };
   }
 
-  async resetPassword(
-    email: string,
-    newPassword: string,
-    refreshToken: string,
-  ) {
+  async forgotPassword(email: string): Promise<any> {
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
-      throw new ForbiddenException('User not found');
+      // Don't reveal if email exists or not
+      return { message: 'If the email exists, a password reset link has been sent' };
     }
 
-    const checkRefreshToken = await verify(user.refreshToken, refreshToken);
+    // Generate reset token
+    const resetToken = await this.jwt.signAsync(
+      { id: user.id, email: user.email },
+      {
+        expiresIn: '1h',
+        secret: this.config.get('JWT_SECRET'),
+      }
+    );
 
-    if (!checkRefreshToken) throw new ForbiddenException('Access Denied');
-
-    // Verify and hash the new password
-    const newPasswordHash = await hash(newPassword);
-
-    // Update the user's password
-    await this.prisma.user.update({
-      where: {
-        email,
-      },
-      data: {
-        password: newPasswordHash,
-      },
-    });
-
-    // Send an email confirmation to the user
-    // await this.mailerService.sendMail({
-    //   to: user.email,
-    //   subject: 'Password Reset Successful',
-    //   template: 'password-reset-success',
-    // });
-
-    const tokens = await this.generateTokens(user);
-    await this.updateRefreshToken(user.id, tokens.refresh_token);
-    return tokens;
+    // In a real app, send email with reset link
+    // For now, just return the token
+    return {
+      message: 'Password reset link sent to your email',
+      resetToken, // Remove this in production
+    };
   }
 
-  async getUserIdFromToken(token: string): Promise<string | null> {
+  async resetPassword(resetToken: string, newPassword: string): Promise<any> {
     try {
-      const decodedToken: any = this.jwtService.verify(token);
-      // Assuming your JWT payload contains the user ID as 'sub'
-      return decodedToken.sub;
-    } catch (error) {
-      throw new UnauthorizedException('Invalid token');
-    }
-  }
-
-  async updateUserProfile(user: any, userId: string): Promise<any> {
-    const existingUser = await this.prisma.user.findFirst({
-      where: { id: userId },
-    });
-
-    if (!existingUser) {
-      return {
-        message: 'No user with such Id found',
-        data: {},
-        statusCode: 404,
-      };
-    }
-
-    try {
-      const updatedUser = await this.prisma.user.update({
-        where: { id: existingUser.id },
-        data: {
-          ...user,
-        },
+      // Verify reset token
+      const payload = await this.jwt.verifyAsync(resetToken, {
+        secret: this.config.get('JWT_SECRET'),
       });
-      return updatedUser;
-    } catch (error) {
-      return httpErrorException(error);
-    }
-  }
 
-  async getAllUsers() {
-    const users = await this.prisma.user.findMany();
-    return users;
+      // Validate new password
+      this.validatePasswordStrength(newPassword);
+
+      // Hash new password
+      const newPasswordHash = await hash(newPassword, {
+        type: 2,
+        memoryCost: 2 ** 16,
+        timeCost: 3,
+        parallelism: 1,
+      });
+
+      // Update password
+      await this.prisma.user.update({
+        where: { id: payload.id },
+        data: { password: newPasswordHash },
+      });
+
+      return { message: 'Password reset successfully' };
+    } catch (error) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
   }
 }
