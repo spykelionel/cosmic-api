@@ -93,6 +93,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ## 🛡️ Security Features Implemented
 
 ### 1. **Authentication & Authorization**
+
 - ✅ JWT-based authentication with refresh tokens
 - ✅ Role-based access control (User, Vendor, Admin)
 - ✅ Ownership-based resource protection
@@ -100,6 +101,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - ✅ Account ban protection
 
 ### 2. **Guards & Security**
+
 - ✅ `JwtAuthGuard` - JWT token validation
 - ✅ `RolesGuard` - Role-based access control
 - ✅ `OwnershipGuard` - Resource ownership validation
@@ -107,6 +109,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - ✅ `ApiKeyGuard` - External service authentication
 
 ### 3. **Rate Limiting**
+
 - ✅ **Strict**: 5 requests per minute (auth operations)
 - ✅ **Moderate**: 20 requests per minute (CRUD operations)
 - ✅ **Loose**: 100 requests per minute (read operations)
@@ -114,6 +117,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - ✅ **Upload**: 10 requests per minute (file uploads)
 
 ### 4. **Password Security**
+
 - ✅ Minimum 8 characters
 - ✅ Uppercase and lowercase letters
 - ✅ Numbers and special characters
@@ -121,6 +125,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - ✅ Secure password reset flow
 
 ### 5. **API Security**
+
 - ✅ CORS protection
 - ✅ Input validation and sanitization
 - ✅ SQL injection prevention (Prisma ORM)
@@ -184,16 +189,19 @@ async searchProducts() { ... }
 ## 🚀 Getting Started
 
 ### 1. **Install Dependencies**
+
 ```bash
 npm install
 ```
 
 ### 2. **Set Environment Variables**
+
 - Copy the `.env` example above
 - Generate strong JWT secrets
 - Configure your database and Cloudinary
 
 ### 3. **Database Setup**
+
 ```bash
 # Generate Prisma client
 npx prisma generate
@@ -206,6 +214,7 @@ npx prisma db seed
 ```
 
 ### 4. **Start the Application**
+
 ```bash
 # Development
 npm run start:dev
@@ -216,6 +225,7 @@ npm run start:prod
 ```
 
 ### 5. **Test Security Features**
+
 ```bash
 # Run tests
 npm run test
@@ -230,6 +240,7 @@ npm run test:cov
 ## 🔍 Testing Security
 
 ### Test Authentication
+
 ```bash
 # Register user
 curl -X POST http://localhost:3000/auth/register \
@@ -243,6 +254,7 @@ curl -X POST http://localhost:3000/auth/login \
 ```
 
 ### Test Role-Based Access
+
 ```bash
 # Try to access admin endpoint without admin role
 curl -X GET http://localhost:3000/admin/users \
@@ -250,6 +262,7 @@ curl -X GET http://localhost:3000/admin/users \
 ```
 
 ### Test Rate Limiting
+
 ```bash
 # Make multiple rapid requests to see rate limiting
 for i in {1..10}; do
@@ -260,6 +273,7 @@ done
 ## 🚨 Security Best Practices
 
 ### 1. **Production Deployment**
+
 - ✅ Use HTTPS only
 - ✅ Set `NODE_ENV=production`
 - ✅ Use strong, unique JWT secrets
@@ -268,6 +282,7 @@ done
 - ✅ Use environment-specific configurations
 
 ### 2. **Monitoring & Logging**
+
 - ✅ Monitor failed authentication attempts
 - ✅ Log rate limit violations
 - ✅ Track suspicious API usage patterns
@@ -275,6 +290,7 @@ done
 - ✅ Set up alerting for security events
 
 ### 3. **Regular Security Updates**
+
 - ✅ Keep dependencies updated
 - ✅ Monitor security advisories
 - ✅ Regular security audits
@@ -300,6 +316,7 @@ done
 ### Support
 
 If you encounter issues:
+
 1. Check the logs for detailed error messages
 2. Verify all environment variables are set correctly
 3. Ensure all dependencies are installed
@@ -308,4 +325,4 @@ If you encounter issues:
 
 ---
 
-**⚠️ Security Notice**: This configuration provides a strong security foundation, but security is an ongoing process. Regularly review and update your security measures based on your specific requirements and threat landscape. 
+**⚠️ Security Notice**: This configuration provides a strong security foundation, but security is an ongoing process. Regularly review and update your security measures based on your specific requirements and threat landscape.
