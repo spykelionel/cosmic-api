@@ -5,6 +5,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 // E-commerce modules
+import { ResponseTemplateInterceptor } from './core/interceptors/response-template/response-template.interceptor';
 import { AdminModule } from './modules/admin/admin.module';
 import { CartModule } from './modules/cart/cart.module';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -38,6 +39,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
         configureCloudinary(configService),
       inject: [ConfigService],
     },
+    ResponseTemplateInterceptor,
   ],
 })
 export class AppModule {}
