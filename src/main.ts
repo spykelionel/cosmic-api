@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as express from 'express';
 import { AppModule } from './app.module';
+import { ResponseTemplateInterceptor } from './core/interceptors/response-template/response-template.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -20,6 +21,7 @@ async function bootstrap() {
   });
 
   app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalInterceptors(app.get(ResponseTemplateInterceptor));
 
   const config = new DocumentBuilder()
     .setTitle('COSMIC STORE API')
