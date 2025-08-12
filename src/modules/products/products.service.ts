@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto, UpdateProductDto } from './dto';
 
@@ -20,6 +24,14 @@ export class ProductsService {
       data: {
         ...createProductDto,
         vendorId,
+        categoryId: createProductDto.categoryId as any,
+        isActive: true,
+        isFeatured: false,
+        isOnSale: false,
+        averageRating: 0,
+        // reviewCount: 0,
+        stock: 0,
+        sku: '',
       },
       include: {
         category: true,
@@ -103,11 +115,13 @@ export class ProductsService {
     ]);
 
     // Calculate average rating for each product
-    const productsWithRating = products.map(product => ({
+    const productsWithRating = products.map((product) => ({
       ...product,
-      averageRating: product.reviews.length > 0
-        ? product.reviews.reduce((acc, review) => acc + review.rating, 0) / product.reviews.length
-        : 0,
+      averageRating:
+        product.reviews.length > 0
+          ? product.reviews.reduce((acc, review) => acc + review.rating, 0) /
+            product.reviews.length
+          : 0,
       reviewCount: product.reviews.length,
     }));
 
@@ -154,9 +168,11 @@ export class ProductsService {
     }
 
     // Calculate average rating
-    const averageRating = product.reviews.length > 0
-      ? product.reviews.reduce((acc, review) => acc + review.rating, 0) / product.reviews.length
-      : 0;
+    const averageRating =
+      product.reviews.length > 0
+        ? product.reviews.reduce((acc, review) => acc + review.rating, 0) /
+          product.reviews.length
+        : 0;
 
     return {
       ...product,
@@ -165,7 +181,12 @@ export class ProductsService {
     };
   }
 
-  async updateProduct(id: string, updateProductDto: UpdateProductDto, userId: string, isAdmin: boolean) {
+  async updateProduct(
+    id: string,
+    updateProductDto: UpdateProductDto,
+    userId: string,
+    isAdmin: boolean,
+  ) {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: { vendor: true },
@@ -247,7 +268,12 @@ export class ProductsService {
       throw new NotFoundException('Category not found');
     }
 
-    const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
     const skip = (page - 1) * limit;
 
     const [products, total] = await Promise.all([
@@ -274,11 +300,13 @@ export class ProductsService {
       this.prisma.product.count({ where: { categoryId, isActive: true } }),
     ]);
 
-    const productsWithRating = products.map(product => ({
+    const productsWithRating = products.map((product) => ({
       ...product,
-      averageRating: product.reviews.length > 0
-        ? product.reviews.reduce((acc, review) => acc + review.rating, 0) / product.reviews.length
-        : 0,
+      averageRating:
+        product.reviews.length > 0
+          ? product.reviews.reduce((acc, review) => acc + review.rating, 0) /
+            product.reviews.length
+          : 0,
       reviewCount: product.reviews.length,
     }));
 
@@ -295,7 +323,15 @@ export class ProductsService {
   }
 
   async searchProducts(query: string, filters: any = {}) {
-    const { page = 1, limit = 10, category, minPrice, maxPrice, sortBy = 'createdAt', sortOrder = 'desc' } = filters;
+    const {
+      page = 1,
+      limit = 10,
+      category,
+      minPrice,
+      maxPrice,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = filters;
     const skip = (page - 1) * limit;
 
     const where: any = {
@@ -340,11 +376,13 @@ export class ProductsService {
       this.prisma.product.count({ where }),
     ]);
 
-    const productsWithRating = products.map(product => ({
+    const productsWithRating = products.map((product) => ({
       ...product,
-      averageRating: product.reviews.length > 0
-        ? product.reviews.reduce((acc, review) => acc + review.rating, 0) / product.reviews.length
-        : 0,
+      averageRating:
+        product.reviews.length > 0
+          ? product.reviews.reduce((acc, review) => acc + review.rating, 0) /
+            product.reviews.length
+          : 0,
       reviewCount: product.reviews.length,
     }));
 
@@ -394,4 +432,4 @@ export class ProductsService {
       },
     });
   }
-} 
+}

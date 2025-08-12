@@ -1,192 +1,238 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import Stripe from 'stripe';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  ConfirmPaymentDto,
   CreatePaymentIntentDto,
-  PaymentMethodDto,
+  CreateRefundDto,
+  PaymentIntentDto,
   PaymentStatus,
-  PaymentWebhookDto,
+  WebhookEventDto,
 } from './dto';
 
 @Injectable()
 export class PaymentService {
-  constructor(private prisma: PrismaService) {}
+  private stripe: Stripe;
+
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {
+    this.stripe = new Stripe(
+      this.configService.get<string>('STRIPE_SECRET_KEY'),
+      {
+        apiVersion: '2025-07-30.basil',
+      },
+    );
+  }
 
   async createPaymentIntent(
-    userId: string,
     createPaymentIntentDto: CreatePaymentIntentDto,
-  ) {
-    const { orderId, amount, currency, paymentMethod, metadata } =
-      createPaymentIntentDto;
-
-    // Check if order exists and belongs to user
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, userId },
-    });
-
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    // Check if order already has a payment
-    const existingPayment = await this.prisma.payment.findUnique({
-      where: { orderId },
-    });
-
-    if (existingPayment) {
-      throw new BadRequestException('Order already has a payment');
-    }
-
-    // Validate order amount matches payment amount
-    if (order.totalAmount !== amount / 100) {
-      // Convert cents to dollars
-      throw new BadRequestException(
-        'Payment amount does not match order total',
-      );
-    }
-
-    // Create payment record
-    const payment = await this.prisma.payment.create({
-      data: {
-        orderId,
-        amount: amount / 100, // Store in dollars
-        currency,
-        status: PaymentStatus.PENDING,
-        paymentMethod,
-        metadata,
-      },
-    });
-
-    // In a real implementation, you would integrate with a payment provider like Stripe
-    // For now, we'll simulate the payment intent creation
-    const paymentIntent = {
-      id: `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      clientSecret: `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_secret_${Math.random().toString(36).substr(2, 9)}`,
-      amount,
-      currency,
-      status: 'requires_payment_method',
-      paymentMethod,
-      metadata: {
-        orderId,
-        userId,
-        ...(metadata || {}),
-      },
-    };
-
-    return {
-      paymentIntent,
-      payment: {
-        id: payment.id,
-        status: payment.status,
-        amount: payment.amount,
-        currency: payment.currency,
-      },
-    };
-  }
-
-  async processPayment(paymentIntentId: string, paymentMethodId: string) {
-    // In a real implementation, you would confirm the payment with the payment provider
-    // For now, we'll simulate the payment processing
-
-    // Find the payment by payment intent ID (you might need to store this mapping)
-    const payment = await this.prisma.payment.findFirst({
-      where: {
-        metadata: {
-          path: ['paymentIntentId'],
-          equals: paymentIntentId,
-        } as any,
-      },
-    });
-
-    if (!payment) {
-      throw new NotFoundException('Payment not found');
-    }
-
-    // Simulate payment processing
-    const updatedPayment = await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: PaymentStatus.COMPLETED,
-        transactionId: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        metadata: {
-          // ...payment.metadata,
-          paymentMethodId,
-          processedAt: new Date().toISOString(),
-        },
-      },
-    });
-
-    // Update order status
-    await this.prisma.order.update({
-      where: { id: payment.orderId },
-      data: { status: 'PROCESSING' },
-    });
-
-    return {
-      success: true,
-      payment: updatedPayment,
-      message: 'Payment processed successfully',
-    };
-  }
-
-  async handleWebhook(webhookData: PaymentWebhookDto) {
-    const { payload, signature } = webhookData;
-
-    // In a real implementation, you would verify the webhook signature
-    // For now, we'll process the webhook without verification
-
+    userId: string,
+  ): Promise<PaymentIntentDto> {
     try {
-      // Extract payment information from webhook payload
-      const { paymentIntentId, status, amount, currency } = payload;
+      // Verify order exists and belongs to user
+      const order = await this.prisma.order.findUnique({
+        where: { id: createPaymentIntentDto.orderId },
+        include: { user: true },
+      });
 
-      // Find the payment
-      const payment = await this.prisma.payment.findFirst({
-        where: {
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      if (order.userId !== userId) {
+        throw new ForbiddenException(
+          'You can only create payment intents for your own orders',
+        );
+      }
+
+      if (order.status !== ('PENDING' as any)) {
+        throw new BadRequestException('Order is not in pending status');
+      }
+
+      // Check if payment already exists
+      const existingPayment = await this.prisma.payment.findFirst({
+        where: { orderId: createPaymentIntentDto.orderId },
+      });
+
+      if (existingPayment) {
+        throw new BadRequestException('Payment already exists for this order');
+      }
+
+      // Create Stripe payment intent
+      const paymentIntent = await this.stripe.paymentIntents.create({
+        amount: Math.round(order.totalAmount * 100), // Convert to cents
+        currency: createPaymentIntentDto.currency || 'USD',
+        metadata: {
+          orderId: order.id,
+          userId: userId,
+          ...createPaymentIntentDto.metadata,
+        },
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        description: `Payment for order ${order.orderNumber}`,
+      });
+
+      // Store payment intent in database
+      const payment = await this.prisma.payment.create({
+        data: {
+          orderId: order.id,
+          amount: order.totalAmount,
+          currency: createPaymentIntentDto.currency || 'USD',
+          status: PaymentStatus.PENDING,
+          paymentMethod: createPaymentIntentDto.paymentMethod as any,
+          transactionId: paymentIntent.id,
           metadata: {
-            path: ['paymentIntentId'],
-            equals: paymentIntentId,
-          } as any,
+            stripePaymentIntentId: paymentIntent.id,
+            clientSecret: paymentIntent.client_secret,
+            ...createPaymentIntentDto.metadata,
+          },
         },
       });
 
+      return {
+        id: payment.id,
+        amount: Math.round(payment.amount * 100), // Return in cents for Stripe
+        currency: payment.currency,
+        status: payment.status as any,
+        paymentMethod: payment.paymentMethod,
+        clientSecret: paymentIntent.client_secret,
+        createdAt: payment.createdAt.toISOString(),
+        metadata: payment.metadata as any,
+      };
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeError) {
+        throw new BadRequestException(`Stripe error: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async confirmPayment(
+    confirmPaymentDto: ConfirmPaymentDto,
+    userId: string,
+  ): Promise<any> {
+    try {
+      // Verify payment exists and belongs to user
+      const payment = await this.prisma.payment.findFirst({
+        where: {
+          transactionId: confirmPaymentDto.paymentIntentId,
+          order: { userId: userId },
+        },
+        include: { order: true },
+      });
+
       if (!payment) {
-        throw new NotFoundException('Payment not found');
+        throw new NotFoundException('Payment not found or access denied');
       }
 
-      // Update payment status based on webhook
-      let paymentStatus: PaymentStatus;
-      let orderStatus: string;
+      // Retrieve payment intent from Stripe
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(
+        confirmPaymentDto.paymentIntentId,
+      );
 
-      switch (status) {
-        case 'succeeded':
-          paymentStatus = PaymentStatus.COMPLETED;
-          orderStatus = 'PROCESSING';
-          break;
-        case 'payment_failed':
-          paymentStatus = PaymentStatus.FAILED;
-          orderStatus = 'CANCELLED';
-          break;
-        case 'canceled':
-          paymentStatus = PaymentStatus.CANCELLED;
-          orderStatus = 'CANCELLED';
-          break;
-        default:
-          paymentStatus = PaymentStatus.PROCESSING;
-          orderStatus = 'PENDING';
+      if (paymentIntent.status === 'succeeded') {
+        // Update payment status
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.SUCCEEDED,
+            metadata: {
+              ...(payment.metadata as any),
+              confirmedAt: new Date().toISOString(),
+              stripeStatus: paymentIntent.status,
+            },
+          },
+        });
+
+        // Update order status
+        await this.prisma.order.update({
+          where: { id: payment.orderId },
+          data: { status: 'CONFIRMED' as any },
+        });
+
+        return {
+          message: 'Payment confirmed successfully',
+          paymentId: payment.id,
+          orderId: payment.orderId,
+          status: PaymentStatus.SUCCEEDED,
+        };
+      } else if (paymentIntent.status === 'requires_payment_method') {
+        throw new BadRequestException(
+          'Payment requires additional authentication',
+        );
+      } else if (paymentIntent.status === 'canceled') {
+        throw new BadRequestException('Payment was canceled');
+      } else {
+        throw new BadRequestException(
+          `Payment is in ${paymentIntent.status} status`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeError) {
+        throw new BadRequestException(`Stripe error: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async createRefund(
+    createRefundDto: CreateRefundDto,
+    userId: string,
+  ): Promise<any> {
+    try {
+      // Verify payment exists and belongs to user
+      const payment = await this.prisma.payment.findFirst({
+        where: {
+          transactionId: createRefundDto.paymentIntentId,
+          order: { userId: userId },
+        },
+        include: { order: true },
+      });
+
+      if (!payment) {
+        throw new NotFoundException('Payment not found or access denied');
       }
 
-      // Update payment
-      const updatedPayment = await this.prisma.payment.update({
+      if (payment.status !== PaymentStatus.SUCCEEDED) {
+        throw new BadRequestException(
+          'Only successful payments can be refunded',
+        );
+      }
+
+      // Create refund in Stripe
+      const refundAmount =
+        createRefundDto.amount || Math.round(payment.amount * 100);
+      const refund = await this.stripe.refunds.create({
+        payment_intent: createRefundDto.paymentIntentId,
+        amount: refundAmount,
+        reason: createRefundDto.reason || ('requested_by_customer' as any),
+        metadata: {
+          orderId: payment.orderId,
+          userId: userId,
+          reason: createRefundDto.reason,
+        },
+      });
+
+      // Update payment status
+      await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
-          // status: paymentStatus,
+          status: PaymentStatus.REFUNDED,
           metadata: {
             // ...payment.metadata,
-            webhookReceivedAt: new Date().toISOString(),
-            webhookStatus: status,
+            refundId: refund.id,
+            refundAmount: refundAmount / 100,
+            refundReason: createRefundDto.reason,
+            refundedAt: new Date().toISOString(),
           },
         },
       });
@@ -194,89 +240,152 @@ export class PaymentService {
       // Update order status
       await this.prisma.order.update({
         where: { id: payment.orderId },
-        data: { status: orderStatus as any },
+        data: { status: 'REFUNDED' as any },
       });
 
       return {
-        success: true,
-        message: 'Webhook processed successfully',
-        payment: updatedPayment,
+        message: 'Refund created successfully',
+        refundId: refund.id,
+        amount: refundAmount / 100,
+        currency: payment.currency,
+        status: 'refunded',
       };
     } catch (error) {
-      return {
-        success: false,
-        message: 'Webhook processing failed',
-        error: error.message,
-      };
+      if (error instanceof Stripe.errors.StripeError) {
+        throw new BadRequestException(`Stripe error: ${error.message}`);
+      }
+      throw error;
     }
   }
 
-  async getPaymentMethods(userId: string) {
-    // In a real implementation, you would fetch payment methods from the payment provider
-    // For now, we'll return mock data
-    const mockPaymentMethods: PaymentMethodDto[] = [
-      {
-        id: 'pm_1234567890',
-        type: 'CREDIT_CARD' as any,
-        details: {
-          last4: '4242',
-          brand: 'visa',
-          expMonth: 12,
-          expYear: 2025,
-        },
-        isDefault: true,
-      },
-      {
-        id: 'pm_0987654321',
-        type: 'DEBIT_CARD' as any,
-        details: {
-          last4: '5555',
-          brand: 'mastercard',
-          expMonth: 6,
-          expYear: 2026,
-        },
-        isDefault: false,
-      },
-    ];
+  async getPaymentMethods(userId: string): Promise<any[]> {
+    try {
+      // Get user's saved payment methods from Stripe
+      const customer = await this.getOrCreateStripeCustomer(userId);
 
-    return mockPaymentMethods;
+      const paymentMethods = await this.stripe.paymentMethods.list({
+        customer: customer.id,
+        type: 'card',
+      });
+
+      return paymentMethods.data.map((pm) => ({
+        id: pm.id,
+        type: pm.type,
+        card: pm.card
+          ? {
+              brand: pm.card.brand,
+              last4: pm.card.last4,
+              expMonth: pm.card.exp_month,
+              expYear: pm.card.exp_year,
+            }
+          : undefined,
+        billingDetails: pm.billing_details
+          ? {
+              name: pm.billing_details.name,
+              email: pm.billing_details.email,
+              address: pm.billing_details.address
+                ? {
+                    line1: pm.billing_details.address.line1,
+                    line2: pm.billing_details.address.line2,
+                    city: pm.billing_details.address.city,
+                    state: pm.billing_details.address.state,
+                    postalCode: pm.billing_details.address.postal_code,
+                    country: pm.billing_details.address.country,
+                  }
+                : undefined,
+            }
+          : undefined,
+      }));
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeError) {
+        throw new BadRequestException(`Stripe error: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async savePaymentMethod(
+    paymentMethodId: string,
+    userId: string,
+  ): Promise<any> {
+    try {
+      const customer = await this.getOrCreateStripeCustomer(userId);
+
+      // Attach payment method to customer
+      await this.stripe.paymentMethods.attach(paymentMethodId, {
+        customer: customer.id,
+      });
+
+      return { message: 'Payment method saved successfully' };
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeError) {
+        throw new BadRequestException(`Stripe error: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async removePaymentMethod(
+    paymentMethodId: string,
+    userId: string,
+  ): Promise<any> {
+    try {
+      const customer = await this.getOrCreateStripeCustomer(userId);
+
+      // Verify payment method belongs to customer
+      const paymentMethod =
+        await this.stripe.paymentMethods.retrieve(paymentMethodId);
+      if (paymentMethod.customer !== customer.id) {
+        throw new ForbiddenException('Payment method does not belong to you');
+      }
+
+      // Detach payment method
+      await this.stripe.paymentMethods.detach(paymentMethodId);
+
+      return { message: 'Payment method removed successfully' };
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeError) {
+        throw new BadRequestException(`Stripe error: ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   async getPaymentHistory(
     userId: string,
     page: number = 1,
-    limit: number = 20,
-  ) {
+    limit: number = 10,
+  ): Promise<any> {
     const skip = (page - 1) * limit;
 
     const [payments, total] = await Promise.all([
       this.prisma.payment.findMany({
-        where: {
-          order: { userId },
-        },
-        include: {
-          order: {
-            select: {
-              id: true,
-              orderNumber: true,
-              totalAmount: true,
-              status: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
+        where: { order: { userId: userId } },
+        include: { order: true },
         skip,
         take: limit,
+        orderBy: { createdAt: 'desc' },
       }),
       this.prisma.payment.count({
-        where: {
-          order: { userId },
-        },
+        where: { order: { userId: userId } },
       }),
     ]);
 
     return {
-      payments,
+      payments: payments.map((payment) => ({
+        id: payment.id,
+        amount: payment.amount,
+        currency: payment.currency,
+        status: payment.status,
+        paymentMethod: payment.paymentMethod,
+        transactionId: payment.transactionId,
+        createdAt: payment.createdAt,
+        order: {
+          id: payment.order.id,
+          orderNumber: payment.order.orderNumber,
+          status: payment.order.status,
+        },
+      })),
       pagination: {
         page,
         limit,
@@ -286,55 +395,200 @@ export class PaymentService {
     };
   }
 
-  async refundPayment(paymentId: string, userId: string, amount?: number) {
-    // Check if payment exists and belongs to user
+  async handleWebhook(
+    webhookEvent: WebhookEventDto,
+    signature: string,
+  ): Promise<any> {
+    try {
+      const endpointSecret = this.configService.get<string>(
+        'STRIPE_WEBHOOK_SECRET',
+      );
+
+      if (!endpointSecret) {
+        throw new BadRequestException('Webhook secret not configured');
+      }
+
+      // Verify webhook signature
+      let event: Stripe.Event;
+      try {
+        event = this.stripe.webhooks.constructEvent(
+          JSON.stringify(webhookEvent),
+          signature,
+          endpointSecret,
+        );
+      } catch (err) {
+        throw new BadRequestException('Webhook signature verification failed');
+      }
+
+      // Handle different event types
+      switch (event.type) {
+        case 'payment_intent.succeeded':
+          await this.handlePaymentSuccess(
+            event.data.object as Stripe.PaymentIntent,
+          );
+          break;
+        case 'payment_intent.payment_failed':
+          await this.handlePaymentFailure(
+            event.data.object as Stripe.PaymentIntent,
+          );
+          break;
+        case 'charge.refunded':
+          await this.handleRefundSuccess(event.data.object as Stripe.Charge);
+          break;
+        default:
+          console.log(`Unhandled event type: ${event.type}`);
+      }
+
+      return { message: 'Webhook processed successfully' };
+    } catch (error) {
+      console.error('Webhook processing error:', error);
+      throw error;
+    }
+  }
+
+  private async handlePaymentSuccess(
+    paymentIntent: Stripe.PaymentIntent,
+  ): Promise<void> {
+    const payment = await this.prisma.payment.findFirst({
+      where: { transactionId: paymentIntent.id },
+    });
+
+    if (payment) {
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.SUCCEEDED,
+          metadata: {
+            ...(payment.metadata as any),
+            webhookProcessed: true,
+            processedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      await this.prisma.order.update({
+        where: { id: payment.orderId },
+        data: { status: 'CONFIRMED' as any },
+      });
+    }
+  }
+
+  private async handlePaymentFailure(
+    paymentIntent: Stripe.PaymentIntent,
+  ): Promise<void> {
+    const payment = await this.prisma.payment.findFirst({
+      where: { transactionId: paymentIntent.id },
+    });
+
+    if (payment) {
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.FAILED,
+          metadata: {
+            ...(payment.metadata as any),
+            webhookProcessed: true,
+            failureReason: paymentIntent.last_payment_error?.message,
+            processedAt: new Date().toISOString(),
+          },
+        },
+      });
+    }
+  }
+
+  private async handleRefundSuccess(charge: Stripe.Charge): Promise<void> {
+    const payment = await this.prisma.payment.findFirst({
+      where: { transactionId: charge.payment_intent as string },
+    });
+
+    if (payment) {
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.REFUNDED,
+          metadata: {
+            ...(payment.metadata as any),
+            webhookProcessed: true,
+            refundProcessed: true,
+            processedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      await this.prisma.order.update({
+        where: { id: payment.orderId },
+        data: { status: 'REFUNDED' as any },
+      });
+    }
+  }
+
+  private async getOrCreateStripeCustomer(
+    userId: string,
+  ): Promise<Stripe.Customer> {
+    // Check if user already has a Stripe customer ID
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, stripeCustomerId: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.stripeCustomerId) {
+      try {
+        return (await this.stripe.customers.retrieve(
+          user.stripeCustomerId,
+        )) as any;
+      } catch (error) {
+        // Customer might have been deleted in Stripe, create a new one
+        console.log('Stripe customer not found, creating new one');
+      }
+    }
+
+    // Create new Stripe customer
+    const customer = await this.stripe.customers.create({
+      email: user.email,
+      name: user.name,
+      metadata: {
+        userId: user.id,
+      },
+    });
+
+    // Update user with Stripe customer ID
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { stripeCustomerId: customer.id as any },
+    });
+
+    return customer;
+  }
+
+  async getPaymentStatus(
+    paymentIntentId: string,
+    userId: string,
+  ): Promise<any> {
     const payment = await this.prisma.payment.findFirst({
       where: {
-        id: paymentId,
-        order: { userId },
+        transactionId: paymentIntentId,
+        order: { userId: userId },
       },
+      include: { order: true },
     });
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundException('Payment not found or access denied');
     }
-
-    if (payment.status !== PaymentStatus.COMPLETED) {
-      throw new BadRequestException('Payment cannot be refunded');
-    }
-
-    // In a real implementation, you would process the refund with the payment provider
-    // For now, we'll simulate the refund
-
-    const refundAmount = amount || payment.amount;
-
-    // Create refund record
-    const refund = await this.prisma.payment.create({
-      data: {
-        orderId: payment.orderId,
-        amount: -refundAmount, // Negative amount for refund
-        currency: payment.currency,
-        status: PaymentStatus.REFUNDED,
-        paymentMethod: payment.paymentMethod,
-        metadata: {
-          type: 'refund',
-          originalPaymentId: payment.id,
-          refundAmount,
-          refundedAt: new Date().toISOString(),
-        },
-      },
-    });
-
-    // Update original payment status
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: PaymentStatus.REFUNDED },
-    });
 
     return {
-      success: true,
-      refund,
-      message: `Payment refunded successfully for $${refundAmount}`,
+      id: payment.id,
+      status: payment.status,
+      amount: payment.amount,
+      currency: payment.currency,
+      orderId: payment.orderId,
+      orderNumber: payment.order.orderNumber,
+      createdAt: payment.createdAt,
+      updatedAt: payment.updatedAt,
     };
   }
 }

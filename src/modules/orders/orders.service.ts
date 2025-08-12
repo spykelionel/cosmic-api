@@ -108,8 +108,8 @@ export class OrdersService {
         data: {
           orderId: newOrder.id,
           amount: totalAmount,
-          paymentMethod: createOrderDto.paymentMethod,
-          status: 'PENDING',
+          paymentMethod: createOrderDto.paymentMethod as any,
+          status: 'PENDING' as any,
         },
       });
 
@@ -236,7 +236,7 @@ export class OrdersService {
     // Update order status
     await this.prisma.order.update({
       where: { id: orderId },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED' as any },
     });
 
     // Restore product stock
