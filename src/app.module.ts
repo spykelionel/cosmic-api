@@ -16,6 +16,17 @@ import { StageModule } from './modules/stage/stage.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { TestimonialModule } from './modules/testimonial/testimonial.module';
 import { PrismaModule } from './prisma/prisma.module';
+
+// E-commerce modules
+import { AdminModule } from './modules/admin/admin.module';
+import { CartModule } from './modules/cart/cart.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentModule } from './modules/payment/payment.module';
+import { ProductsModule } from './modules/products/products.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { UploadModule } from './modules/upload/upload.module';
+import { UsersModule } from './modules/users/users.module';
+import { WishlistModule } from './modules/wishlist/wishlist.module';
 @Module({
   imports: [
     AuthModule,
@@ -32,6 +43,17 @@ import { PrismaModule } from './prisma/prisma.module';
     TestimonialModule,
     FeatureModule,
     SubscriptionModule,
+
+    // E-commerce modules
+    ProductsModule,
+    CartModule,
+    OrdersModule,
+    UsersModule,
+    ReviewsModule,
+    WishlistModule,
+    AdminModule,
+    PaymentModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [

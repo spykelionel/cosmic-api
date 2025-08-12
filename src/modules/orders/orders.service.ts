@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto';
 
@@ -77,6 +81,7 @@ export class OrdersService {
       });
 
       // Create order items
+
       for (const item of orderItems) {
         await prisma.orderItem.create({
           data: {
@@ -323,7 +328,11 @@ export class OrdersService {
     };
   }
 
-  async updateOrderStatus(orderId: string, vendorId: string, updateOrderStatusDto: UpdateOrderStatusDto) {
+  async updateOrderStatus(
+    orderId: string,
+    vendorId: string,
+    updateOrderStatusDto: UpdateOrderStatusDto,
+  ) {
     const order = await this.prisma.order.findFirst({
       where: {
         id: orderId,
@@ -338,7 +347,9 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException('Order not found or you are not authorized to update it');
+      throw new NotFoundException(
+        'Order not found or you are not authorized to update it',
+      );
     }
 
     const updatedOrder = await this.prisma.order.update({
@@ -353,59 +364,55 @@ export class OrdersService {
   }
 
   async getVendorStats(vendorId: string) {
-    const [
-      totalProducts,
-      totalOrders,
-      totalRevenue,
-      orderStatusCounts,
-    ] = await Promise.all([
-      this.prisma.product.count({
-        where: { vendorId, isActive: true },
-      }),
-      this.prisma.order.count({
-        where: {
-          orderItems: {
-            some: {
-              product: {
-                vendorId,
+    const [totalProducts, totalOrders, totalRevenue, orderStatusCounts] =
+      await Promise.all([
+        this.prisma.product.count({
+          where: { vendorId, isActive: true },
+        }),
+        this.prisma.order.count({
+          where: {
+            orderItems: {
+              some: {
+                product: {
+                  vendorId,
+                },
               },
             },
           },
-        },
-      }),
-      this.prisma.order.aggregate({
-        where: {
-          orderItems: {
-            some: {
-              product: {
-                vendorId,
+        }),
+        this.prisma.order.aggregate({
+          where: {
+            orderItems: {
+              some: {
+                product: {
+                  vendorId,
+                },
+              },
+            },
+            status: {
+              in: ['CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED'],
+            },
+          },
+          _sum: {
+            totalAmount: true,
+          },
+        }),
+        this.prisma.order.groupBy({
+          by: ['status'],
+          where: {
+            orderItems: {
+              some: {
+                product: {
+                  vendorId,
+                },
               },
             },
           },
-          status: {
-            in: ['CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED'],
+          _count: {
+            status: true,
           },
-        },
-        _sum: {
-          totalAmount: true,
-        },
-      }),
-      this.prisma.order.groupBy({
-        by: ['status'],
-        where: {
-          orderItems: {
-            some: {
-              product: {
-                vendorId,
-              },
-            },
-          },
-        },
-        _count: {
-          status: true,
-        },
-      }),
-    ]);
+        }),
+      ]);
 
     return {
       totalProducts,
@@ -417,4 +424,4 @@ export class OrdersService {
       }, {}),
     };
   }
-} 
+}
