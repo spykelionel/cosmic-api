@@ -1,31 +1,26 @@
 import {
   Body,
   Controller,
-  Post,
-  UseGuards,
-  Request,
   HttpCode,
   HttpStatus,
+  Post,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import {
-  ApiTags,
+  ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiResponse,
-  ApiBody,
-  ApiBearerAuth,
+  ApiTags,
 } from '@nestjs/swagger';
+import {
+  AuthRateLimit,
+  StrictRateLimit,
+} from '../../core/decorators/rate-limit.decorator';
 import { JwtAuthGuard } from '../../core/guards/jwt.auth.guard';
 import { AuthService } from './auth.service';
 import { LoginDTO, RegisterDTO } from './dto';
-import { 
-  AuthRateLimit, 
-  StrictRateLimit 
-} from '../../core/decorators/rate-limit.decorator';
-import { 
-  Roles, 
-  AdminOnly 
-} from '../../core/decorators/roles.decorator';
-import { UserRole } from '../admin/dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -35,9 +30,9 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @AuthRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'User registration',
-    description: 'Register a new user account with email and password'
+    description: 'Register a new user account with email and password',
   })
   @ApiBody({ type: RegisterDTO })
   @ApiResponse({
@@ -74,9 +69,9 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @AuthRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'User login',
-    description: 'Authenticate user with email and password'
+    description: 'Authenticate user with email and password',
   })
   @ApiBody({ type: LoginDTO })
   @ApiResponse({
@@ -104,7 +99,10 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid credentials' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid credentials',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden - account banned' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async login(@Body() loginDto: LoginDTO) {
@@ -114,9 +112,9 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @StrictRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Refresh access token',
-    description: 'Get new access token using refresh token'
+    description: 'Get new access token using refresh token',
   })
   @ApiBody({
     schema: {
@@ -139,7 +137,10 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid refresh token' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid refresh token',
+  })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async refreshToken(@Body() body: { refresh_token: string }) {
     return this.authService.refreshToken(body.refresh_token);
@@ -149,9 +150,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'User logout',
-    description: 'Logout user and invalidate refresh token'
+    description: 'Logout user and invalidate refresh token',
   })
   @ApiResponse({
     status: 200,
@@ -171,9 +172,9 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @AuthRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Request password reset',
-    description: 'Send password reset link to user email'
+    description: 'Send password reset link to user email',
   })
   @ApiBody({
     schema: {
@@ -202,9 +203,9 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @StrictRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Reset password',
-    description: 'Reset password using reset token'
+    description: 'Reset password using reset token',
   })
   @ApiBody({
     schema: {
@@ -226,9 +227,14 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Bad request - invalid token or weak password' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid token or weak password',
+  })
   @ApiResponse({ status: 429, description: 'Too many requests' })
-  async resetPassword(@Body() body: { reset_token: string; new_password: string }) {
+  async resetPassword(
+    @Body() body: { reset_token: string; new_password: string },
+  ) {
     return this.authService.resetPassword(body.reset_token, body.new_password);
   }
 
@@ -236,9 +242,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Change password',
-    description: 'Change user password (requires current password)'
+    description: 'Change user password (requires current password)',
   })
   @ApiBody({
     schema: {
@@ -260,21 +266,28 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Bad request - invalid current password or weak new password' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid current password or weak new password',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async changePassword(
     @Request() req,
     @Body() body: { current_password: string; new_password: string },
   ) {
-    return this.authService.changePassword(req.user.id, body.current_password, body.new_password);
+    return this.authService.changePassword(
+      req.user.id,
+      body.current_password,
+      body.new_password,
+    );
   }
 
   @Post('admin/login')
   @HttpCode(HttpStatus.OK)
   @AuthRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Admin login',
-    description: 'Authenticate admin user (separate from regular login)'
+    description: 'Authenticate admin user (separate from regular login)',
   })
   @ApiBody({ type: LoginDTO })
   @ApiResponse({
@@ -290,7 +303,10 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid credentials' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid credentials',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden - not an admin' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async adminLogin(@Body() loginDto: LoginDTO) {
@@ -300,9 +316,9 @@ export class AuthController {
   @Post('vendor/login')
   @HttpCode(HttpStatus.OK)
   @AuthRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Vendor login',
-    description: 'Authenticate vendor user'
+    description: 'Authenticate vendor user',
   })
   @ApiBody({ type: LoginDTO })
   @ApiResponse({
@@ -318,7 +334,10 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid credentials' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid credentials',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden - not a vendor' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async vendorLogin(@Body() loginDto: LoginDTO) {
@@ -329,9 +348,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Validate token',
-    description: 'Check if current JWT token is valid'
+    description: 'Check if current JWT token is valid',
   })
   @ApiResponse({
     status: 200,
