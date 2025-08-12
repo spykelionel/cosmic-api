@@ -3,12 +3,9 @@ import {
   Controller,
   Delete,
   FileTypeValidator,
-  Get,
   MaxFileSizeValidator,
-  Param,
   ParseFilePipe,
   Post,
-  Query,
   UploadedFile,
   UploadedFiles,
   UseGuards,
@@ -20,8 +17,6 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOperation,
-  ApiParam,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -189,45 +184,6 @@ export class UploadController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async deleteMultipleFiles(@Body() body: { publicIds: string[] }) {
     return this.uploadService.deleteMultipleFiles(body.publicIds);
-  }
-
-  @Get('file/:publicId')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get file information' })
-  @ApiParam({ name: 'publicId', description: 'Cloudinary public ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'File information retrieved successfully',
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getFileInfo(@Param('publicId') publicId: string) {
-    return this.uploadService.getFileInfo(publicId);
-  }
-
-  @Get('signed-url/:publicId')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Generate signed URL for file' })
-  @ApiParam({ name: 'publicId', description: 'Cloudinary public ID' })
-  @ApiQuery({
-    name: 'transformation',
-    required: false,
-    description: 'Image transformation options (JSON string)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Signed URL generated successfully',
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async generateSignedUrl(
-    @Param('publicId') publicId: string,
-    @Query('transformation') transformation?: string,
-  ) {
-    const transformationObj = transformation
-      ? JSON.parse(transformation)
-      : undefined;
-    return this.uploadService.generateSignedUrl(publicId, transformationObj);
   }
 
   @Post('product-images')

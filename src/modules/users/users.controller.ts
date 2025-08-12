@@ -1,27 +1,27 @@
 import {
-  Controller,
-  Get,
-  Put,
-  Post,
-  Delete,
   Body,
+  Controller,
+  Delete,
+  Get,
   Param,
-  UseGuards,
-  Request,
   ParseUUIDPipe,
+  Post,
+  Put,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
   ApiBearerAuth,
+  ApiOperation,
   ApiParam,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../core/guards/jwt.auth.guard';
-import { UsersService } from './users.service';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateAddressDto, UpdateAddressDto } from './dto/address.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UsersService } from './users.service';
 
 @ApiTags('Users')
 @Controller('users')
@@ -51,7 +51,10 @@ export class UsersController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
+  async updateProfile(
+    @Request() req,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
     return this.usersService.updateProfile(req.user.id, updateProfileDto);
   }
 
@@ -64,7 +67,10 @@ export class UsersController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto) {
+  async changePassword(
+    @Request() req,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
     return this.usersService.changePassword(req.user.id, changePasswordDto);
   }
 
@@ -88,7 +94,8 @@ export class UsersController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async addAddress(@Request() req, @Body() createAddressDto: CreateAddressDto) {
-    return this.usersService.addAddress(req.user.id, createAddressDto);
+    // return this.usersService.addAddress(req.user.id, createAddressDto);
+    return 'Not implemented';
   }
 
   @Put('addresses/:addressId')
@@ -106,7 +113,11 @@ export class UsersController {
     @Param('addressId', ParseUUIDPipe) addressId: string,
     @Body() updateAddressDto: UpdateAddressDto,
   ) {
-    return this.usersService.updateAddress(req.user.id, addressId, updateAddressDto);
+    return this.usersService.updateAddress(
+      req.user.id,
+      addressId,
+      updateAddressDto,
+    );
   }
 
   @Delete('addresses/:addressId')
@@ -140,4 +151,4 @@ export class UsersController {
   ) {
     return this.usersService.setDefaultAddress(req.user.id, addressId);
   }
-} 
+}

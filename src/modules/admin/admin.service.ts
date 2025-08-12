@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UpdateUserRoleDto, UpdateUserStatusDto, AdminStatsQueryDto } from './dto';
+import {
+  AdminStatsQueryDto,
+  UpdateUserRoleDto,
+  UpdateUserStatusDto,
+} from './dto';
 
 @Injectable()
 export class AdminService {
@@ -12,9 +16,8 @@ export class AdminService {
     const where = search
       ? {
           OR: [
-            { email: { contains: search, mode: 'insensitive' } },
-            { firstName: { contains: search, mode: 'insensitive' } },
-            { lastName: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' as any } },
+            { name: { contains: search, mode: 'insensitive' as any } },
           ],
         }
       : {};
@@ -25,9 +28,7 @@ export class AdminService {
         select: {
           id: true,
           email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
+          name: true,
           isVendor: true,
           createdAt: true,
           updatedAt: true,
@@ -35,7 +36,6 @@ export class AdminService {
             select: {
               orders: true,
               reviews: true,
-              products: true,
             },
           },
         },
@@ -63,9 +63,7 @@ export class AdminService {
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
+        name: true,
         isVendor: true,
         createdAt: true,
         updatedAt: true,
@@ -97,23 +95,11 @@ export class AdminService {
           orderBy: { createdAt: 'desc' },
           take: 10,
         },
-        products: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            stock: true,
-            isActive: true,
-            createdAt: true,
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
+
         _count: {
           select: {
             orders: true,
             reviews: true,
-            products: true,
             addresses: true,
           },
         },
@@ -148,8 +134,7 @@ export class AdminService {
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
+        name: true,
         isVendor: true,
         updatedAt: true,
       },
@@ -158,7 +143,10 @@ export class AdminService {
     return updatedUser;
   }
 
-  async updateUserStatus(userId: string, updateUserStatusDto: UpdateUserStatusDto) {
+  async updateUserStatus(
+    userId: string,
+    updateUserStatusDto: UpdateUserStatusDto,
+  ) {
     const { status, reason } = updateUserStatusDto;
 
     // Check if user exists
@@ -173,10 +161,10 @@ export class AdminService {
     // For now, we'll use a simple approach with a status field
     // In a real application, you might want to add a status field to the User model
     // or implement a more sophisticated status management system
-    
+
     // For this implementation, we'll just return a success message
     // You can extend this based on your specific requirements
-    
+
     return {
       message: `User status updated to ${status}`,
       userId,
@@ -189,7 +177,7 @@ export class AdminService {
   async getAllOrders(page: number = 1, limit: number = 20, status?: string) {
     const skip = (page - 1) * limit;
 
-    const where = status ? { status } : {};
+    const where = status ? { status: status as any } : {};
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -199,8 +187,7 @@ export class AdminService {
             select: {
               id: true,
               email: true,
-              firstName: true,
-              lastName: true,
+              name: true,
             },
           },
           orderItems: {
@@ -239,7 +226,7 @@ export class AdminService {
 
   async getAdminStats(query: AdminStatsQueryDto) {
     const { startDate, endDate } = query;
-    
+
     const dateFilter = {
       ...(startDate && { gte: new Date(startDate) }),
       ...(endDate && { lte: new Date(endDate) }),
@@ -260,33 +247,33 @@ export class AdminService {
     ] = await Promise.all([
       // Total users
       this.prisma.user.count(),
-      
+
       // Total vendors
       this.prisma.user.count({
         where: { isVendor: true },
       }),
-      
+
       // Total products
       this.prisma.product.count({
         where: { isActive: true },
       }),
-      
+
       // Total orders
       this.prisma.order.count({
         where: {
           createdAt: dateFilter,
         },
       }),
-      
+
       // Total revenue
       this.prisma.order.aggregate({
         where: {
-          status: { in: ['COMPLETED', 'DELIVERED'] },
+          status: { in: ['COMPLETED', 'DELIVERED'] as any },
           createdAt: dateFilter,
         },
         _sum: { totalAmount: true },
       }),
-      
+
       // Pending orders
       this.prisma.order.count({
         where: {
@@ -294,15 +281,15 @@ export class AdminService {
           createdAt: dateFilter,
         },
       }),
-      
+
       // Completed orders
       this.prisma.order.count({
         where: {
-          status: { in: ['COMPLETED', 'DELIVERED'] },
+          status: { in: ['COMPLETED', 'DELIVERED'] as any },
           createdAt: dateFilter,
         },
       }),
-      
+
       // Cancelled orders
       this.prisma.order.count({
         where: {
@@ -310,22 +297,22 @@ export class AdminService {
           createdAt: dateFilter,
         },
       }),
-      
+
       // Average order value
       this.prisma.order.aggregate({
         where: {
-          status: { in: ['COMPLETED', 'DELIVERED'] },
+          status: { in: ['COMPLETED', 'DELIVERED'] as any },
           createdAt: dateFilter,
         },
         _avg: { totalAmount: true },
       }),
-      
+
       // Top selling products
       this.prisma.orderItem.groupBy({
         by: ['productId'],
         where: {
           order: {
-            status: { in: ['COMPLETED', 'DELIVERED'] },
+            status: { in: ['COMPLETED', 'DELIVERED'] as any },
             createdAt: dateFilter,
           },
         },
@@ -335,7 +322,7 @@ export class AdminService {
         },
         take: 10,
       }),
-      
+
       // Recent orders
       this.prisma.order.findMany({
         where: {
@@ -346,8 +333,7 @@ export class AdminService {
             select: {
               id: true,
               email: true,
-              firstName: true,
-              lastName: true,
+              name: true,
             },
           },
           orderItems: {
@@ -413,7 +399,7 @@ export class AdminService {
     try {
       // Test database connection
       await this.prisma.$queryRaw`SELECT 1`;
-      
+
       // Get basic system info
       const stats = await this.prisma.$queryRaw`
         SELECT 
@@ -437,4 +423,4 @@ export class AdminService {
       };
     }
   }
-} 
+}

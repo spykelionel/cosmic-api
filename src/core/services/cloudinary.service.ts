@@ -19,4 +19,13 @@ export class CloudinaryService {
       });
     });
   }
+
+  async deleteImage(publicId: string) {
+    return new Promise((resolve, reject) => {
+      v2.uploader.destroy(publicId, (error, result) => {
+        if (error) reject(error);
+        resolve(result);
+      });
+    });
+  }
 }

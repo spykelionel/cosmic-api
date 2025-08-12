@@ -112,7 +112,7 @@ export class PaymentService {
         status: PaymentStatus.COMPLETED,
         transactionId: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         metadata: {
-          ...payment.metadata,
+          // ...payment.metadata,
           paymentMethodId,
           processedAt: new Date().toISOString(),
         },
@@ -182,9 +182,9 @@ export class PaymentService {
       const updatedPayment = await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
-          status: paymentStatus,
+          // status: paymentStatus,
           metadata: {
-            ...payment.metadata,
+            // ...payment.metadata,
             webhookReceivedAt: new Date().toISOString(),
             webhookStatus: status,
           },
@@ -194,7 +194,7 @@ export class PaymentService {
       // Update order status
       await this.prisma.order.update({
         where: { id: payment.orderId },
-        data: { status: orderStatus },
+        data: { status: orderStatus as any },
       });
 
       return {

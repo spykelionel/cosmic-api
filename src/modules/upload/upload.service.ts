@@ -50,23 +50,12 @@ export class UploadService {
       }
 
       // Upload to Cloudinary
-      const result = await this.cloudinaryService.uploadFile(
-        file.buffer,
-        uploadOptions,
-      );
+      const result = await this.cloudinaryService.uploadImage(file.path);
 
       return {
         success: true,
         file: {
-          publicId: result.public_id,
-          url: result.secure_url,
-          format: result.format,
-          size: result.bytes,
-          width: result.width,
-          height: result.height,
-          folder: result.folder,
-          tags: result.tags || [],
-          uploadedAt: new Date(),
+          ...(result as any),
         },
         message: 'File uploaded successfully',
       };
@@ -115,21 +104,13 @@ export class UploadService {
 
       // Upload all files
       const uploadPromises = files.map((file) =>
-        this.cloudinaryService.uploadFile(file.buffer, uploadOptions),
+        this.cloudinaryService.uploadImage(file.path),
       );
 
       const results = await Promise.all(uploadPromises);
 
       const uploadedFiles = results.map((result) => ({
-        publicId: result.public_id,
-        url: result.secure_url,
-        format: result.format,
-        size: result.bytes,
-        width: result.width,
-        height: result.height,
-        folder: result.folder,
-        tags: result.tags || [],
-        uploadedAt: new Date(),
+        ...(result as any),
       }));
 
       return {
@@ -148,14 +129,7 @@ export class UploadService {
       const { publicId } = deleteFileDto;
 
       // Delete from Cloudinary
-      const result = await this.cloudinaryService.deleteFile(publicId);
-
-      return {
-        success: true,
-        publicId,
-        message: 'File deleted successfully',
-        result,
-      };
+      return this.cloudinaryService.deleteImage(publicId);
     } catch (error) {
       throw new BadRequestException(`Delete failed: ${error.message}`);
     }
@@ -165,7 +139,7 @@ export class UploadService {
     try {
       // Delete multiple files from Cloudinary
       const deletePromises = publicIds.map((publicId) =>
-        this.cloudinaryService.deleteFile(publicId),
+        this.cloudinaryService.deleteImage(publicId),
       );
 
       const results = await Promise.allSettled(deletePromises);
@@ -187,56 +161,6 @@ export class UploadService {
       };
     } catch (error) {
       throw new BadRequestException(`Multiple delete failed: ${error.message}`);
-    }
-  }
-
-  async getFileInfo(publicId: string) {
-    try {
-      // Get file information from Cloudinary
-      const result = await this.cloudinaryService.getFileInfo(publicId);
-
-      return {
-        success: true,
-        file: {
-          publicId: result.public_id,
-          url: result.secure_url,
-          format: result.format,
-          size: result.bytes,
-          width: result.width,
-          height: result.height,
-          folder: result.folder,
-          tags: result.tags || [],
-          createdAt: result.created_at,
-        },
-      };
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to get file info: ${error.message}`,
-      );
-    }
-  }
-
-  async generateSignedUrl(
-    publicId: string,
-    transformation?: Record<string, any>,
-  ) {
-    try {
-      // Generate signed URL for secure access
-      const signedUrl = await this.cloudinaryService.generateSignedUrl(
-        publicId,
-        transformation,
-      );
-
-      return {
-        success: true,
-        publicId,
-        signedUrl,
-        expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
-      };
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to generate signed URL: ${error.message}`,
-      );
     }
   }
 

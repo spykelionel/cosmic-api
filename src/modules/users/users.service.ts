@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateAddressDto } from './dto/address.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { CreateAddressDto, UpdateAddressDto } from './dto/address.dto';
-import * as bcrypt from 'bcrypt';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -15,9 +19,7 @@ export class UsersService {
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
+        name: true,
         isVendor: true,
         createdAt: true,
         updatedAt: true,
@@ -50,21 +52,15 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-    const { firstName, lastName, phone } = updateProfileDto;
-
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: {
-        firstName,
-        lastName,
-        phone,
+        ...updateProfileDto,
       },
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
+        name: true,
         isVendor: true,
         updatedAt: true,
       },
@@ -87,13 +83,13 @@ export class UsersService {
     }
 
     // Verify current password
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const isPasswordValid = await argon2.verify(user.password, currentPassword);
     if (!isPasswordValid) {
       throw new BadRequestException('Current password is incorrect');
     }
 
     // Hash new password
-    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    const hashedNewPassword = await argon2.hash(newPassword);
 
     // Update password
     await this.prisma.user.update({
@@ -107,39 +103,40 @@ export class UsersService {
   async getUserAddresses(userId: string) {
     const addresses = await this.prisma.address.findMany({
       where: { userId },
-      orderBy: [
-        { isDefault: 'desc' },
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
     });
 
     return addresses;
   }
 
-  async addAddress(userId: string, createAddressDto: CreateAddressDto) {
-    const { isDefault, ...addressData } = createAddressDto;
+  // async addAddress(userId: string, createAddressDto: CreateAddressDto) {
+  //   const { isDefault, ...addressData } = createAddressDto;
 
-    // If this is the first address or marked as default, set it as default
-    if (isDefault) {
-      // Remove default from all other addresses
-      await this.prisma.address.updateMany({
-        where: { userId },
-        data: { isDefault: false },
-      });
-    }
+  //   // If this is the first address or marked as default, set it as default
+  //   if (isDefault) {
+  //     // Remove default from all other addresses
+  //     await this.prisma.address.updateMany({
+  //       where: { userId },
+  //       data: { isDefault: false },
+  //     });
+  //   }
 
-    const address = await this.prisma.address.create({
-      data: {
-        ...addressData,
-        userId,
-        isDefault: isDefault || false,
-      },
-    });
+  //   const address = await this.prisma.address.create({
+  //     data: {
+  //       ...addressData,
+  //       userId: userId as string,
+  //       isDefault: isDefault || false,
+  //     },
+  //   });
 
-    return address;
-  }
+  //   return address;
+  // }
 
-  async updateAddress(userId: string, addressId: string, updateAddressDto: UpdateAddressDto) {
+  async updateAddress(
+    userId: string,
+    addressId: string,
+    updateAddressDto: UpdateAddressDto,
+  ) {
     const { isDefault, ...addressData } = updateAddressDto;
 
     // Check if address belongs to user
@@ -226,4 +223,4 @@ export class UsersService {
 
     return updatedAddress;
   }
-} 
+}

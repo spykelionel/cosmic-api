@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AddToWishlistDto } from './dto';
 
@@ -22,7 +26,7 @@ export class WishlistService {
               salePrice: true,
               images: true,
               stock: true,
-              averageRating: true,
+              // averageRating: true,
               category: {
                 select: {
                   id: true,
@@ -179,4 +183,4 @@ export class WishlistService {
 
     return { message: 'Product moved to cart successfully' };
   }
-} 
+}

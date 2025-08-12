@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateReviewDto, UpdateReviewDto } from './dto';
 
@@ -6,7 +10,11 @@ import { CreateReviewDto, UpdateReviewDto } from './dto';
 export class ReviewsService {
   constructor(private prisma: PrismaService) {}
 
-  async createReview(userId: string, productId: string, createReviewDto: CreateReviewDto) {
+  async createReview(
+    userId: string,
+    productId: string,
+    createReviewDto: CreateReviewDto,
+  ) {
     const { rating, comment } = createReviewDto;
 
     // Check if product exists
@@ -33,13 +41,15 @@ export class ReviewsService {
         productId,
         order: {
           userId,
-          status: { in: ['COMPLETED', 'DELIVERED'] },
+          status: { in: ['COMPLETED', 'DELIVERED'] as any },
         },
       },
     });
 
     if (!hasPurchased) {
-      throw new BadRequestException('You can only review products you have purchased');
+      throw new BadRequestException(
+        'You can only review products you have purchased',
+      );
     }
 
     // Create review
@@ -54,8 +64,7 @@ export class ReviewsService {
         user: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
+            name: true,
           },
         },
       },
@@ -67,7 +76,11 @@ export class ReviewsService {
     return review;
   }
 
-  async getProductReviews(productId: string, page: number = 1, limit: number = 10) {
+  async getProductReviews(
+    productId: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     const skip = (page - 1) * limit;
 
     // Check if product exists
@@ -87,8 +100,7 @@ export class ReviewsService {
           user: {
             select: {
               id: true,
-              firstName: true,
-              lastName: true,
+              name: true,
             },
           },
         },
@@ -116,14 +128,20 @@ export class ReviewsService {
     };
   }
 
-  async updateReview(userId: string, reviewId: string, updateReviewDto: UpdateReviewDto) {
+  async updateReview(
+    userId: string,
+    reviewId: string,
+    updateReviewDto: UpdateReviewDto,
+  ) {
     // Check if review exists and belongs to user
     const review = await this.prisma.review.findFirst({
       where: { id: reviewId, userId },
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found or you are not authorized to edit it');
+      throw new NotFoundException(
+        'Review not found or you are not authorized to edit it',
+      );
     }
 
     // Update review
@@ -134,8 +152,7 @@ export class ReviewsService {
         user: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
+            name: true,
           },
         },
       },
@@ -154,7 +171,9 @@ export class ReviewsService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found or you are not authorized to delete it');
+      throw new NotFoundException(
+        'Review not found or you are not authorized to delete it',
+      );
     }
 
     // Delete review
@@ -203,7 +222,11 @@ export class ReviewsService {
     };
   }
 
-  async getVendorProductReviews(vendorId: string, page: number = 1, limit: number = 10) {
+  async getVendorProductReviews(
+    vendorId: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     const skip = (page - 1) * limit;
 
     const [reviews, total] = await Promise.all([
@@ -217,8 +240,7 @@ export class ReviewsService {
           user: {
             select: {
               id: true,
-              firstName: true,
-              lastName: true,
+              name: true,
             },
           },
           product: {
@@ -226,6 +248,7 @@ export class ReviewsService {
               id: true,
               name: true,
               images: true,
+              averageRating: true,
             },
           },
         },
@@ -272,7 +295,7 @@ export class ReviewsService {
 
     await this.prisma.product.update({
       where: { id: productId },
-      data: { averageRating },
+      data: { averageRating: averageRating as any },
     });
   }
-} 
+}
