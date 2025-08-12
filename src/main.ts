@@ -11,8 +11,8 @@ async function bootstrap() {
 
   // setup swagger docs
   const swagConfig = new DocumentBuilder()
-    .setTitle('API Documentation')
-    .setDescription('API Documentation')
+    .setTitle('COSMIC STORE: API Documentation')
+    .setDescription('COSMIC STORE: API Documentation')
     .setVersion('1.0')
     .addBearerAuth(
       {
