@@ -28,7 +28,7 @@ export class RegisterDTO {
     required: false,
   })
   @IsOptional()
-  isAdmin?: boolean;
+  isVendor?: boolean;
 }
 
 export class LoginDTO {

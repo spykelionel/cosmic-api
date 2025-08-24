@@ -1,16 +1,15 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
-import { LoginDTO, RegisterDTO } from './dto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from 'argon2';
 import { httpErrorException } from 'src/core/services/utility.service';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { UserRole } from '../admin/dto';
+import { LoginDTO, RegisterDTO } from './dto';
 
 @Injectable()
 export class AuthService {
@@ -57,10 +56,9 @@ export class AuthService {
           name: userData.name,
           email: userData.email,
           password: passwordHash,
-          isAdmin: false,
-          isVendor: false,
-          isUserBan: false,
-          avatar: 'https://aui.atlassian.com/aui/9.3/docs/images/avatar-person.svg',
+          isVendor: userData.isVendor,
+          avatar:
+            'https://aui.atlassian.com/aui/9.3/docs/images/avatar-person.svg',
         },
       });
 
@@ -107,7 +105,9 @@ export class AuthService {
       }
 
       if (user.isUserBan) {
-        throw new ForbiddenException('Your account has been banned. Please contact support.');
+        throw new ForbiddenException(
+          'Your account has been banned. Please contact support.',
+        );
       }
 
       // Check if user is trying to access admin area
@@ -146,7 +146,10 @@ export class AuthService {
         message: 'Login successful',
       };
     } catch (error) {
-      if (error instanceof UnauthorizedException || error instanceof ForbiddenException) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       throw new UnauthorizedException('Login failed. Please try again.');
@@ -239,9 +242,12 @@ export class AuthService {
     }
   }
 
-  async updateRefreshToken(userId: string, refreshToken: string): Promise<void> {
+  async updateRefreshToken(
+    userId: string,
+    refreshToken: string,
+  ): Promise<void> {
     const refreshTokenHash = await hash(refreshToken);
-    
+
     await this.prisma.user.update({
       where: { id: userId },
       data: { refreshToken: refreshTokenHash },
@@ -250,46 +256,60 @@ export class AuthService {
 
   private validatePasswordStrength(password: string): void {
     if (password.length < 8) {
-      throw new BadRequestException('Password must be at least 8 characters long');
+      throw new BadRequestException(
+        'Password must be at least 8 characters long',
+      );
     }
 
     if (!/(?=.*[a-z])/.test(password)) {
-      throw new BadRequestException('Password must contain at least one lowercase letter');
+      throw new BadRequestException(
+        'Password must contain at least one lowercase letter',
+      );
     }
 
     if (!/(?=.*[A-Z])/.test(password)) {
-      throw new BadRequestException('Password must contain at least one uppercase letter');
+      throw new BadRequestException(
+        'Password must contain at least one uppercase letter',
+      );
     }
 
     if (!/(?=.*\d)/.test(password)) {
-      throw new BadRequestException('Password must contain at least one number');
+      throw new BadRequestException(
+        'Password must contain at least one number',
+      );
     }
 
     if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(password)) {
-      throw new BadRequestException('Password must contain at least one special character');
+      throw new BadRequestException(
+        'Password must contain at least one special character',
+      );
     }
   }
 
   private getUserRoles(user: any): string[] {
     const roles = [];
-    
+
     if (user.isAdmin) {
       roles.push('admin');
     }
-    
+
     if (user.isVendor) {
       roles.push('vendor');
     }
-    
+
     if (!user.isAdmin && !user.isVendor) {
       roles.push('user');
     }
-    
+
     return roles;
   }
 
   // Additional security methods
-  async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<any> {
+  async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<any> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { password: true },
@@ -332,7 +352,9 @@ export class AuthService {
 
     if (!user) {
       // Don't reveal if email exists or not
-      return { message: 'If the email exists, a password reset link has been sent' };
+      return {
+        message: 'If the email exists, a password reset link has been sent',
+      };
     }
 
     // Generate reset token
@@ -341,7 +363,7 @@ export class AuthService {
       {
         expiresIn: '1h',
         secret: this.config.get('JWT_SECRET'),
-      }
+      },
     );
 
     // In a real app, send email with reset link
