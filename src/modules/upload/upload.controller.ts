@@ -375,12 +375,12 @@ export class UploadController {
       }),
     )
     files: Express.Multer.File[],
-    @Body() body: { productId: string; tags?: string[] },
+    @Body() body: { productId: string; tags?: string },
   ) {
     const uploadDto: UploadMultipleFilesDto = {
       fileType: FileType.PRODUCT_IMAGE,
       folder: `products/${body.productId}`,
-      tags: body.tags || [],
+      tags: body.tags || 'product',
       transformation: {
         width: 800,
         height: 800,
@@ -436,12 +436,12 @@ export class UploadController {
       }),
     )
     file: Express.Multer.File,
-    @Body() body: { categoryId: string; tags?: string[] },
+    @Body() body: { categoryId: string; tags?: string },
   ) {
     const uploadDto: UploadFileDto = {
       fileType: FileType.CATEGORY_IMAGE,
       folder: `categories/${body.categoryId}`,
-      tags: body.tags || [],
+      tags: body.tags || 'category',
       transformation: {
         width: 400,
         height: 400,
@@ -497,12 +497,12 @@ export class UploadController {
       }),
     )
     file: Express.Multer.File,
-    @Body() body: { userId: string; tags?: string[] },
+    @Body() body: { userId: string; tags?: string },
   ) {
     const uploadDto: UploadFileDto = {
       fileType: FileType.USER_AVATAR,
       folder: `users/avatars/${body.userId}`,
-      tags: body.tags || [],
+      tags: body.tags || 'user',
       transformation: {
         width: 200,
         height: 200,

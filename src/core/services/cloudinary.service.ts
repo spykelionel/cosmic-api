@@ -3,7 +3,7 @@ import { v2 as cloudinary } from 'cloudinary';
 
 export interface CloudinaryUploadOptions {
   folder?: string;
-  tags?: string[];
+  tags?: string;
   transformation?: Record<string, any>;
   resource_type?: 'image' | 'video' | 'raw';
   allowed_formats?: string[];

@@ -44,13 +44,13 @@ export class UploadService {
       // Prepare upload options
       const uploadOptions: CloudinaryUploadOptions = {
         folder: folderPath,
-        tags: tags || [],
         transformation:
           transformation || this.getDefaultTransformation(fileType),
         resource_type: 'image',
         allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
         quality: 'auto',
         format: 'auto',
+        tags: tags,
       };
 
       this.logger.log(
@@ -120,7 +120,7 @@ export class UploadService {
       // Prepare upload options
       const uploadOptions: CloudinaryUploadOptions = {
         folder: folderPath,
-        tags: tags || [],
+        tags: tags || 'product',
         transformation:
           transformation || this.getDefaultTransformation(fileType),
         resource_type: 'image',

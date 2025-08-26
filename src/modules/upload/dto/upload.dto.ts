@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 
 export enum FileType {
   PRODUCT_IMAGE = 'PRODUCT_IMAGE',
@@ -29,12 +29,10 @@ export class UploadFileDto {
   @ApiProperty({
     description: 'Additional tags for the uploaded file',
     required: false,
-    example: ['electronics', 'gadgets'],
+    example: 'product',
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
+  tags?: string;
 
   @ApiProperty({
     description: 'Transformation options for the image',
@@ -69,9 +67,7 @@ export class UploadMultipleFilesDto {
     example: ['electronics', 'gadgets'],
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
+  tags?: string;
 
   @ApiProperty({
     description: 'Transformation options for the images',
