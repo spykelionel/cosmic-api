@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { configureCloudinary } from './core/config/cloudinary.config';
 import { AuthModule } from './modules/auth/auth.module';
+import { CategoriesModule } from './modules/categories/categories.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 // E-commerce modules
@@ -23,6 +24,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     ConfigModule.forRoot({ isGlobal: true }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
 
+    CategoriesModule,
     ProductsModule,
     CartModule,
     OrdersModule,
