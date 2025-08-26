@@ -3,8 +3,11 @@ import {
   Controller,
   Delete,
   FileTypeValidator,
+  Get,
   MaxFileSizeValidator,
+  Param,
   ParseFilePipe,
+  Patch,
   Post,
   UploadedFile,
   UploadedFiles,
@@ -21,7 +24,12 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../core/guards/jwt.auth.guard';
-import { DeleteFileDto, UploadFileDto, UploadMultipleFilesDto } from './dto';
+import {
+  DeleteFileDto,
+  FileType,
+  UploadFileDto,
+  UploadMultipleFilesDto,
+} from './dto';
 import { UploadService } from './upload.service';
 
 @ApiTags('Upload')
@@ -160,6 +168,141 @@ export class UploadController {
     );
   }
 
+  @Get('file/:publicId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get file information' })
+  @ApiResponse({
+    status: 200,
+    description: 'File information retrieved successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async getFileInfo(@Param('publicId') publicId: string) {
+    return this.uploadService.getFileInfo(publicId);
+  }
+
+  @Patch('file/:publicId/transformation')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update file transformation' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        transformation: {
+          type: 'object',
+          description: 'New transformation options',
+          example: { width: 800, height: 600, crop: 'fill' },
+        },
+      },
+      required: ['transformation'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'File transformation updated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async updateFileTransformation(
+    @Param('publicId') publicId: string,
+    @Body() body: { transformation: Record<string, any> },
+  ) {
+    return this.uploadService.updateFileTransformation(
+      publicId,
+      body.transformation,
+    );
+  }
+
+  @Post('file/:publicId/tags')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add tags to file' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags to add to the file',
+          example: ['electronics', 'gadgets'],
+        },
+      },
+      required: ['tags'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Tags added successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async addFileTags(
+    @Param('publicId') publicId: string,
+    @Body() body: { tags: string },
+  ) {
+    return this.uploadService.addFileTags(publicId, body.tags);
+  }
+
+  @Delete('file/:publicId/tags')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Remove tags from file' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags to remove from the file',
+          example: ['electronics', 'gadgets'],
+        },
+      },
+      required: ['tags'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Tags removed successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async removeFileTags(
+    @Param('publicId') publicId: string,
+    @Body() body: { tags: string },
+  ) {
+    return this.uploadService.removeFileTags(publicId, body.tags);
+  }
+
+  @Get('file/:publicId/url')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Generate file URL with optional transformation' })
+  @ApiResponse({
+    status: 200,
+    description: 'File URL generated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async generateFileUrl(
+    @Param('publicId') publicId: string,
+    @Body() body?: { transformation?: Record<string, any> },
+  ) {
+    const url = this.uploadService.generateFileUrl(
+      publicId,
+      body?.transformation,
+    );
+    return {
+      success: true,
+      url,
+      publicId,
+      transformation: body?.transformation || null,
+    };
+  }
+
   @Delete('file')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Delete single file' })
@@ -235,7 +378,7 @@ export class UploadController {
     @Body() body: { productId: string; tags?: string[] },
   ) {
     const uploadDto: UploadMultipleFilesDto = {
-      fileType: 'PRODUCT_IMAGE' as any,
+      fileType: FileType.PRODUCT_IMAGE,
       folder: `products/${body.productId}`,
       tags: body.tags || [],
       transformation: {
@@ -248,5 +391,128 @@ export class UploadController {
     };
 
     return this.uploadService.uploadMultipleFiles(files, uploadDto);
+  }
+
+  @Post('category-images')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiOperation({ summary: 'Upload category image (specialized endpoint)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'Category image to upload',
+        },
+        categoryId: {
+          type: 'string',
+          description: 'Category ID for organizing image',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for the image (optional)',
+        },
+      },
+      required: ['image', 'categoryId'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Category image uploaded successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async uploadCategoryImage(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Body() body: { categoryId: string; tags?: string[] },
+  ) {
+    const uploadDto: UploadFileDto = {
+      fileType: FileType.CATEGORY_IMAGE,
+      folder: `categories/${body.categoryId}`,
+      tags: body.tags || [],
+      transformation: {
+        width: 400,
+        height: 400,
+        crop: 'fill',
+        quality: 'auto',
+        format: 'auto',
+      },
+    };
+
+    return this.uploadService.uploadSingleFile(file, uploadDto);
+  }
+
+  @Post('user-avatar')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('avatar'))
+  @ApiOperation({ summary: 'Upload user avatar (specialized endpoint)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        avatar: {
+          type: 'string',
+          format: 'binary',
+          description: 'User avatar to upload',
+        },
+        userId: {
+          type: 'string',
+          description: 'User ID for organizing avatar',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for the avatar (optional)',
+        },
+      },
+      required: ['avatar', 'userId'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'User avatar uploaded successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async uploadUserAvatar(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Body() body: { userId: string; tags?: string[] },
+  ) {
+    const uploadDto: UploadFileDto = {
+      fileType: FileType.USER_AVATAR,
+      folder: `users/avatars/${body.userId}`,
+      tags: body.tags || [],
+      transformation: {
+        width: 200,
+        height: 200,
+        crop: 'fill',
+        gravity: 'face',
+        quality: 'auto',
+        format: 'auto',
+      },
+    };
+
+    return this.uploadService.uploadSingleFile(file, uploadDto);
   }
 }
