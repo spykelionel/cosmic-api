@@ -105,7 +105,7 @@ curl -X POST http://localhost:8000/upload/single \
   -F "file=@image.jpg" \
   -F "fileType=PRODUCT_IMAGE" \
   -F "folder=products/electronics" \
-  -F "tags[]=electronics&tags[]=gadgets"
+  -F "tags=electronics,gadgets"
 ```
 
 ### 2. Multiple Files Upload
@@ -208,7 +208,7 @@ Add tags to a file.
 
 ```json
 {
-  "tags": ["electronics", "gadgets"]
+  "tags": "electronics,gadgets"
 }
 ```
 
@@ -222,7 +222,7 @@ Remove tags from a file.
 
 ```json
 {
-  "tags": ["electronics", "gadgets"]
+  "tags": "electronics,gadgets"
 }
 ```
 
@@ -323,7 +323,7 @@ Each file type has optimized default transformations:
     "format": "jpg",
     "size": 245760,
     "folder": "products/electronics",
-    "tags": ["electronics", "gadgets"],
+    "tags": "electronics,gadgets",
     "createdAt": "2024-01-01T00:00:00.000Z"
   },
   "message": "File uploaded successfully"

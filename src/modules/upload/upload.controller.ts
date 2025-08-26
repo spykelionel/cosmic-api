@@ -23,6 +23,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { multerOptions } from '../../core/config/multer.config';
 import { JwtAuthGuard } from '../../core/guards/jwt.auth.guard';
 import {
   DeleteFileDto,
@@ -40,7 +41,7 @@ export class UploadController {
 
   @Post('single')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', multerOptions))
   @ApiOperation({ summary: 'Upload single file' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -67,8 +68,7 @@ export class UploadController {
           description: 'Custom folder path (optional)',
         },
         tags: {
-          type: 'array',
-          items: { type: 'string' },
+          type: 'string',
           description: 'Tags for the file (optional)',
         },
         transformation: {
@@ -102,7 +102,7 @@ export class UploadController {
 
   @Post('multiple')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FilesInterceptor('files', 10)) // Max 10 files
+  @UseInterceptors(FilesInterceptor('files', 10, multerOptions)) // Max 10 files
   @ApiOperation({ summary: 'Upload multiple files' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -132,8 +132,7 @@ export class UploadController {
           description: 'Custom folder path (optional)',
         },
         tags: {
-          type: 'array',
-          items: { type: 'string' },
+          type: 'string',
           description: 'Tags for the files (optional)',
         },
         transformation: {
@@ -331,7 +330,7 @@ export class UploadController {
 
   @Post('product-images')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FilesInterceptor('images', 5)) // Max 5 product images
+  @UseInterceptors(FilesInterceptor('images', 5, multerOptions)) // Max 5 product images
   @ApiOperation({ summary: 'Upload product images (specialized endpoint)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -395,7 +394,7 @@ export class UploadController {
 
   @Post('category-images')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image', multerOptions))
   @ApiOperation({ summary: 'Upload category image (specialized endpoint)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -456,7 +455,7 @@ export class UploadController {
 
   @Post('user-avatar')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('avatar'))
+  @UseInterceptors(FileInterceptor('avatar', multerOptions))
   @ApiOperation({ summary: 'Upload user avatar (specialized endpoint)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -514,5 +513,29 @@ export class UploadController {
     };
 
     return this.uploadService.uploadSingleFile(file, uploadDto);
+  }
+
+  @Get('test')
+  @ApiOperation({ summary: 'Test Cloudinary configuration' })
+  @ApiResponse({
+    status: 200,
+    description: 'Configuration test result',
+  })
+  async testConfiguration() {
+    try {
+      // Test if Cloudinary is configured
+      const testResult = await this.uploadService.testCloudinaryConnection();
+      return {
+        success: true,
+        message: 'Cloudinary configuration is working',
+        result: testResult,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Cloudinary configuration failed',
+        error: error.message,
+      };
+    }
   }
 }

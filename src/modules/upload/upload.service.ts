@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import * as fs from 'fs';
 import {
   CloudinaryService,
   CloudinaryUploadOptions,
@@ -23,6 +22,13 @@ export class UploadService {
   ) {
     try {
       const { fileType, folder, tags, transformation } = uploadFileDto;
+
+      // Debug logging
+      this.logger.log(`File received: ${file.originalname}`);
+      this.logger.log(`File size: ${file.size} bytes`);
+      this.logger.log(`File mimetype: ${file.mimetype}`);
+      this.logger.log(`File buffer exists: ${!!file.buffer}`);
+      this.logger.log(`File buffer length: ${file.buffer?.length || 0}`);
 
       // Validate file type
       if (!this.isValidFileType(file.mimetype)) {
@@ -56,15 +62,15 @@ export class UploadService {
       this.logger.log(
         `Uploading single file: ${file.originalname} to folder: ${folderPath}`,
       );
+      this.logger.log(`Upload options: ${JSON.stringify(uploadOptions)}`);
 
-      // Upload to Cloudinary
+      // Upload to Cloudinary using buffer
       const result = await this.cloudinaryService.uploadImage(
-        file.path,
+        file.buffer,
         uploadOptions,
       );
 
-      // Clean up temporary file
-      this.cleanupTempFile(file.path);
+      this.logger.log(`Upload successful: ${result.public_id}`);
 
       return {
         success: true,
@@ -84,10 +90,6 @@ export class UploadService {
       };
     } catch (error) {
       this.logger.error(`Single file upload failed: ${error.message}`);
-      // Clean up temporary file on error
-      if (file?.path) {
-        this.cleanupTempFile(file.path);
-      }
       throw new BadRequestException(`Upload failed: ${error.message}`);
     }
   }
@@ -133,15 +135,13 @@ export class UploadService {
         `Uploading ${files.length} files to folder: ${folderPath}`,
       );
 
-      // Upload all files
+      // Upload all files using buffers
       const uploadPromises = files.map(async (file) => {
         try {
           const result = await this.cloudinaryService.uploadImage(
-            file.path,
+            file.buffer,
             uploadOptions,
           );
-          // Clean up temporary file
-          this.cleanupTempFile(file.path);
 
           return {
             originalName: file.originalname,
@@ -160,8 +160,6 @@ export class UploadService {
           this.logger.error(
             `Failed to upload ${file.originalname}: ${error.message}`,
           );
-          // Clean up temporary file on error
-          this.cleanupTempFile(file.path);
           throw error;
         }
       });
@@ -176,8 +174,6 @@ export class UploadService {
       };
     } catch (error) {
       this.logger.error(`Multiple files upload failed: ${error.message}`);
-      // Clean up all temporary files on error
-      files.forEach((file) => this.cleanupTempFile(file.path));
       throw new BadRequestException(`Multiple upload failed: ${error.message}`);
     }
   }
@@ -312,6 +308,25 @@ export class UploadService {
     }
   }
 
+  async testCloudinaryConnection() {
+    try {
+      this.logger.log('Testing Cloudinary connection...');
+
+      // Try to get account info from Cloudinary
+      const accountInfo = await this.cloudinaryService.getAccountInfo();
+
+      this.logger.log('Cloudinary connection successful');
+      return {
+        success: true,
+        accountInfo,
+        message: 'Cloudinary is properly configured and accessible',
+      };
+    } catch (error) {
+      this.logger.error(`Cloudinary connection test failed: ${error.message}`);
+      throw new Error(`Cloudinary connection failed: ${error.message}`);
+    }
+  }
+
   private isValidFileType(mimetype: string): boolean {
     const allowedTypes = [
       'image/jpeg',
@@ -378,20 +393,6 @@ export class UploadService {
           quality: 'auto',
           format: 'auto',
         };
-    }
-  }
-
-  private cleanupTempFile(filePath: string) {
-    try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        this.logger.log(`Temporary file cleaned up: ${filePath}`);
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Failed to cleanup temporary file: ${filePath}`,
-        error.message,
-      );
     }
   }
 }

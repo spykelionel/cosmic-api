@@ -30,12 +30,29 @@ export class CloudinaryService {
   private readonly logger = new Logger(CloudinaryService.name);
 
   constructor() {
-    // Configuration is handled by the cloudinary.config.ts file
-    // This service will use the global configuration
+    // Configure Cloudinary with environment variables
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      this.logger.error('Missing Cloudinary environment variables');
+      throw new Error(
+        'Cloudinary configuration is incomplete. Please check environment variables.',
+      );
+    }
+
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+    });
+
+    this.logger.log('Cloudinary service initialized successfully');
   }
 
   async uploadImage(
-    filePath: string,
+    filePath: string | Buffer,
     options: CloudinaryUploadOptions = {},
   ): Promise<CloudinaryUploadResult> {
     try {
@@ -55,21 +72,63 @@ export class CloudinaryService {
         format: options.format || 'auto',
       };
 
-      this.logger.log(`Uploading image to Cloudinary: ${filePath}`);
-      this.logger.log(`Upload options: ${JSON.stringify(uploadOptions)}`);
+      // If filePath is a Buffer, use buffer upload
+      if (Buffer.isBuffer(filePath)) {
+        this.logger.log(`Uploading image buffer to Cloudinary`);
+        this.logger.log(`Upload options: ${JSON.stringify(uploadOptions)}`);
 
-      return new Promise((resolve, reject) => {
-        cloudinary.uploader.upload(filePath, uploadOptions, (error, result) => {
-          if (error) {
-            this.logger.error(`Cloudinary upload failed: ${error.message}`);
-            reject(new Error(`Upload failed: ${error.message}`));
-            return;
-          }
+        return new Promise((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream(uploadOptions, (error, result) => {
+              if (error) {
+                this.logger.error(`Cloudinary upload failed: ${error.message}`);
+                reject(new Error(`Upload failed: ${error.message}`));
+                return;
+              }
 
-          this.logger.log(`Image uploaded successfully: ${result.public_id}`);
-          resolve(result as unknown as CloudinaryUploadResult);
+              this.logger.log(
+                `Image uploaded successfully: ${result.public_id}`,
+              );
+              resolve(result as unknown as CloudinaryUploadResult);
+            })
+            .end(filePath);
         });
-      });
+      }
+
+      // If filePath is a string, check if file exists and upload
+      if (typeof filePath === 'string') {
+        // Check if file exists
+        const fs = require('fs');
+        if (!fs.existsSync(filePath)) {
+          throw new Error(`File not found at path: ${filePath}`);
+        }
+
+        this.logger.log(`Uploading image to Cloudinary: ${filePath}`);
+        this.logger.log(`Upload options: ${JSON.stringify(uploadOptions)}`);
+
+        return new Promise((resolve, reject) => {
+          cloudinary.uploader.upload(
+            filePath,
+            uploadOptions,
+            (error, result) => {
+              if (error) {
+                this.logger.error(`Cloudinary upload failed: ${error.message}`);
+                reject(new Error(`Upload failed: ${error.message}`));
+                return;
+              }
+
+              this.logger.log(
+                `Image uploaded successfully: ${result.public_id}`,
+              );
+              resolve(result as unknown as CloudinaryUploadResult);
+            },
+          );
+        });
+      }
+
+      throw new Error(
+        'Invalid file input. Expected Buffer or file path string.',
+      );
     } catch (error) {
       this.logger.error(`Upload service error: ${error.message}`);
       throw new Error(`Upload service error: ${error.message}`);
@@ -312,6 +371,28 @@ export class CloudinaryService {
     } catch (error) {
       this.logger.error(`URL generation error: ${error.message}`);
       throw new Error(`URL generation error: ${error.message}`);
+    }
+  }
+
+  async getAccountInfo(): Promise<any> {
+    try {
+      this.logger.log('Getting Cloudinary account info...');
+
+      return new Promise((resolve, reject) => {
+        cloudinary.api.ping((error, result) => {
+          if (error) {
+            this.logger.error(`Cloudinary ping failed: ${error.message}`);
+            reject(new Error(`Ping failed: ${error.message}`));
+            return;
+          }
+
+          this.logger.log('Cloudinary ping successful');
+          resolve(result);
+        });
+      });
+    } catch (error) {
+      this.logger.error(`Get account info error: ${error.message}`);
+      throw new Error(`Get account info error: ${error.message}`);
     }
   }
 }
