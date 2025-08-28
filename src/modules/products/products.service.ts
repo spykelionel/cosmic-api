@@ -128,10 +128,10 @@ export class ProductsService {
     return {
       products: productsWithRating,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: +page,
+        limit: +limit,
         total,
-        pages: Math.ceil(total / limit),
+        pages: Math.ceil(total / +limit),
       },
     };
   }
