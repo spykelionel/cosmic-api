@@ -30,8 +30,8 @@ export class ProductsService {
         isOnSale: false,
         averageRating: 0,
         // reviewCount: 0,
-        stock: 0,
-        sku: '',
+        stock: createProductDto.stock || 0,
+        sku: createProductDto.sku || '',
       },
       include: {
         category: true,
