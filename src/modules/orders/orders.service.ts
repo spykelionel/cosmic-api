@@ -127,7 +127,7 @@ export class OrdersService {
 
   async findUserOrders(userId: string, query: any = {}) {
     const { page = 1, limit = 10, status } = query;
-    const skip = (page - 1) * limit;
+    const skip = (page - 1) * +limit;
 
     const where: any = { userId };
     if (status) {
@@ -138,7 +138,7 @@ export class OrdersService {
       this.prisma.order.findMany({
         where,
         skip,
-        take: parseInt(limit),
+        take: +limit,
         orderBy: { createdAt: 'desc' },
         include: {
           orderItems: {
@@ -165,10 +165,10 @@ export class OrdersService {
     return {
       orders,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: +page,
+        limit: +limit,
         total,
-        pages: Math.ceil(total / limit),
+        pages: Math.ceil(total / +limit),
       },
     };
   }
@@ -262,7 +262,7 @@ export class OrdersService {
 
   async getVendorOrders(vendorId: string, query: any = {}) {
     const { page = 1, limit = 10, status } = query;
-    const skip = (page - 1) * limit;
+    const skip = (page - 1) * +limit;
 
     const where: any = {
       orderItems: {
@@ -282,7 +282,7 @@ export class OrdersService {
       this.prisma.order.findMany({
         where,
         skip,
-        take: parseInt(limit),
+        take: +limit,
         orderBy: { createdAt: 'desc' },
         include: {
           orderItems: {
@@ -320,10 +320,10 @@ export class OrdersService {
     return {
       orders,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: +page,
+        limit: +limit,
         total,
-        pages: Math.ceil(total / limit),
+        pages: Math.ceil(total / +limit),
       },
     };
   }
