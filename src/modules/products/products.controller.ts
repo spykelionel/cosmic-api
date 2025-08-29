@@ -1,44 +1,39 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
   Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
-  ParseUUIDPipe,
-  ParseIntPipe,
+  Controller,
   DefaultValuePipe,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
   ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
   ApiParam,
   ApiQuery,
-  ApiBody,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
+import {
+  AdminOrVendor,
+  ModerateRateLimit,
+  OwnProduct,
+  SearchRateLimit,
+} from '../../core/decorators';
 import { JwtAuthGuard } from '../../core/guards/jwt.auth.guard';
-import { RolesGuard } from '../../core/guards/roles.guard';
 import { OwnershipGuard } from '../../core/guards/ownership.guard';
-import { RateLimitGuard } from '../../core/guards/rate-limit.guard';
-import { 
-  AdminOrVendor, 
-  AdminOnly,
-  OwnProduct 
-} from '../../core/decorators';
-import { 
-  SearchRateLimit, 
-  ModerateRateLimit 
-} from '../../core/decorators';
-import { ProductsService } from './products.service';
+import { RolesGuard } from '../../core/guards/roles.guard';
 import { CreateProductDto, UpdateProductDto } from './dto';
+import { ProductsService } from './products.service';
 
 @ApiTags('Products')
 @Controller('products')
@@ -48,18 +43,43 @@ export class ProductsController {
 
   @Get()
   @ModerateRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get all products',
-    description: 'Retrieve all products with filtering, sorting, and pagination'
+    description:
+      'Retrieve all products with filtering, sorting, and pagination',
   })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page' })
-  @ApiQuery({ name: 'category', required: false, description: 'Category filter' })
-  @ApiQuery({ name: 'minPrice', required: false, description: 'Minimum price filter' })
-  @ApiQuery({ name: 'maxPrice', required: false, description: 'Maximum price filter' })
-  @ApiQuery({ name: 'rating', required: false, description: 'Minimum rating filter' })
-  @ApiQuery({ name: 'sortBy', required: false, description: 'Sort field (price, rating, date)' })
-  @ApiQuery({ name: 'sortOrder', required: false, description: 'Sort order (asc, desc)' })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description: 'Category filter',
+  })
+  @ApiQuery({
+    name: 'minPrice',
+    required: false,
+    description: 'Minimum price filter',
+  })
+  @ApiQuery({
+    name: 'maxPrice',
+    required: false,
+    description: 'Maximum price filter',
+  })
+  @ApiQuery({
+    name: 'rating',
+    required: false,
+    description: 'Minimum rating filter',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description: 'Sort field (price, rating, date)',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    description: 'Sort order (asc, desc)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Products retrieved successfully',
@@ -90,9 +110,9 @@ export class ProductsController {
 
   @Get(':id')
   @ModerateRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get product by ID',
-    description: 'Retrieve detailed information about a specific product'
+    description: 'Retrieve detailed information about a specific product',
   })
   @ApiParam({ name: 'id', description: 'Product ID' })
   @ApiResponse({
@@ -102,7 +122,7 @@ export class ProductsController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
-  async findProductById(@Param('id', ParseUUIDPipe) id: string) {
+  async findProductById(@Param('id') id: string) {
     return this.productsService.findProductById(id);
   }
 
@@ -111,9 +131,9 @@ export class ProductsController {
   @AdminOrVendor()
   @ModerateRateLimit()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Create new product',
-    description: 'Create a new product (admin/vendor only)'
+    description: 'Create a new product (admin/vendor only)',
   })
   @ApiBody({ type: CreateProductDto })
   @ApiResponse({
@@ -122,7 +142,10 @@ export class ProductsController {
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin/Vendor access required' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin/Vendor access required',
+  })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async createProduct(
     @Request() req,
@@ -137,9 +160,9 @@ export class ProductsController {
   @OwnProduct()
   @ModerateRateLimit()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update product',
-    description: 'Update an existing product (admin/vendor only)'
+    description: 'Update an existing product (admin/vendor only)',
   })
   @ApiParam({ name: 'id', description: 'Product ID' })
   @ApiBody({ type: UpdateProductDto })
@@ -149,15 +172,23 @@ export class ProductsController {
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin/Vendor access required' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin/Vendor access required',
+  })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async updateProduct(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
     @Request() req,
   ) {
-    return this.productsService.updateProduct(id, updateProductDto, req.user.id, req.user.isAdmin);
+    return this.productsService.updateProduct(
+      id,
+      updateProductDto,
+      req.user.id,
+      req.user.isAdmin,
+    );
   }
 
   @Delete(':id')
@@ -166,9 +197,9 @@ export class ProductsController {
   @OwnProduct()
   @ModerateRateLimit()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Delete product',
-    description: 'Delete a product (admin/vendor only)'
+    description: 'Delete a product (admin/vendor only)',
   })
   @ApiParam({ name: 'id', description: 'Product ID' })
   @ApiResponse({
@@ -177,21 +208,25 @@ export class ProductsController {
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin/Vendor access required' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin/Vendor access required',
+  })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
-  async deleteProduct(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Request() req,
-  ) {
-    return this.productsService.deleteProduct(id, req.user.id, req.user.isAdmin);
+  async deleteProduct(@Param('id') id: string, @Request() req) {
+    return this.productsService.deleteProduct(
+      id,
+      req.user.id,
+      req.user.isAdmin,
+    );
   }
 
   @Get('categories/all')
   @ModerateRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get all categories',
-    description: 'Retrieve all product categories'
+    description: 'Retrieve all product categories',
   })
   @ApiResponse({
     status: 200,
@@ -204,9 +239,9 @@ export class ProductsController {
 
   @Get('category/:categoryId')
   @ModerateRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get products by category',
-    description: 'Retrieve products filtered by category'
+    description: 'Retrieve products filtered by category',
   })
   @ApiParam({ name: 'categoryId', description: 'Category ID' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
@@ -219,18 +254,21 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: 'Category not found' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async getProductsByCategory(
-    @Param('categoryId', ParseUUIDPipe) categoryId: string,
+    @Param('categoryId') categoryId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
-    return this.productsService.getProductsByCategory(categoryId, { page, limit });
+    return this.productsService.getProductsByCategory(categoryId, {
+      page,
+      limit,
+    });
   }
 
   @Get('filters/available')
   @ModerateRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get available filters',
-    description: 'Retrieve available filter options for products'
+    description: 'Retrieve available filter options for products',
   })
   @ApiResponse({
     status: 200,
@@ -244,9 +282,9 @@ export class ProductsController {
   @Post('filter')
   @SearchRateLimit()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Filter products',
-    description: 'Apply advanced filters to products'
+    description: 'Apply advanced filters to products',
   })
   @ApiBody({
     schema: {
@@ -283,9 +321,9 @@ export class ProductsController {
 
   @Get('search/query')
   @SearchRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Search products',
-    description: 'Search products by text query'
+    description: 'Search products by text query',
   })
   @ApiQuery({ name: 'q', required: true, description: 'Search query' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
@@ -315,19 +353,26 @@ export class VendorProductsController {
 
   @Get()
   @ModerateRateLimit()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get vendor products',
-    description: 'Retrieve all products for the authenticated vendor'
+    description: 'Retrieve all products for the authenticated vendor',
   })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page' })
-  @ApiQuery({ name: 'status', required: false, description: 'Product status filter' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Product status filter',
+  })
   @ApiResponse({
     status: 200,
     description: 'Vendor products retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Vendor access required' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Vendor access required',
+  })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async getVendorProducts(
     @Request() req,
@@ -337,4 +382,4 @@ export class VendorProductsController {
   ) {
     return this.productsService.getVendorProducts(req.user.id);
   }
-} 
+}

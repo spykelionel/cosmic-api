@@ -72,7 +72,7 @@ export class AdminController {
     description: 'Forbidden - Admin access required',
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async getUserById(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getUserById(@Param('userId') userId: string) {
     return this.adminService.getUserById(userId);
   }
 
@@ -91,7 +91,7 @@ export class AdminController {
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async updateUserRole(
-    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('userId') userId: string,
     @Body() updateUserRoleDto: UpdateUserRoleDto,
   ) {
     return this.adminService.updateUserRole(userId, updateUserRoleDto);
@@ -112,7 +112,7 @@ export class AdminController {
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async updateUserStatus(
-    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('userId') userId: string,
     @Body() updateUserStatusDto: UpdateUserStatusDto,
   ) {
     return this.adminService.updateUserStatus(userId, updateUserStatusDto);

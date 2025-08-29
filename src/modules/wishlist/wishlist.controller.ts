@@ -1,28 +1,27 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Delete,
   Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
-  ParseUUIDPipe,
-  ParseIntPipe,
+  Controller,
   DefaultValuePipe,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
   ApiBearerAuth,
+  ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../core/guards/jwt.auth.guard';
-import { WishlistService } from './wishlist.service';
 import { AddToWishlistDto } from './dto';
+import { WishlistService } from './wishlist.service';
 
 @ApiTags('Wishlist')
 @Controller('wishlist')
@@ -57,7 +56,10 @@ export class WishlistController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Product not found' })
-  async addToWishlist(@Request() req, @Body() addToWishlistDto: AddToWishlistDto) {
+  async addToWishlist(
+    @Request() req,
+    @Body() addToWishlistDto: AddToWishlistDto,
+  ) {
     return this.wishlistService.addToWishlist(req.user.id, addToWishlistDto);
   }
 
@@ -72,7 +74,7 @@ export class WishlistController {
   @ApiResponse({ status: 404, description: 'Product not found in wishlist' })
   async removeFromWishlist(
     @Request() req,
-    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param('productId') productId: string,
   ) {
     return this.wishlistService.removeFromWishlist(req.user.id, productId);
   }
@@ -110,10 +112,7 @@ export class WishlistController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Product not found in wishlist' })
-  async moveToCart(
-    @Request() req,
-    @Param('productId', ParseUUIDPipe) productId: string,
-  ) {
+  async moveToCart(@Request() req, @Param('productId') productId: string) {
     return this.wishlistService.moveToCart(req.user.id, productId);
   }
 
@@ -127,9 +126,12 @@ export class WishlistController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async checkWishlistStatus(
     @Request() req,
-    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param('productId') productId: string,
   ) {
-    const isInWishlist = await this.wishlistService.isInWishlist(req.user.id, productId);
+    const isInWishlist = await this.wishlistService.isInWishlist(
+      req.user.id,
+      productId,
+    );
     return { isInWishlist };
   }
-} 
+}

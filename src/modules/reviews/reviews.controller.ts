@@ -1,29 +1,28 @@
 import {
+  Body,
   Controller,
+  DefaultValuePipe,
+  Delete,
   Get,
+  Param,
+  ParseIntPipe,
   Post,
   Put,
-  Delete,
-  Body,
-  Param,
   Query,
-  UseGuards,
   Request,
-  ParseUUIDPipe,
-  ParseIntPipe,
-  DefaultValuePipe,
+  UseGuards,
 } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
   ApiBearerAuth,
+  ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../core/guards/jwt.auth.guard';
-import { ReviewsService } from './reviews.service';
 import { CreateReviewDto, UpdateReviewDto } from './dto';
+import { ReviewsService } from './reviews.service';
 
 @ApiTags('Reviews')
 @Controller('reviews')
@@ -44,10 +43,14 @@ export class ReviewsController {
   @ApiResponse({ status: 404, description: 'Product not found' })
   async createReview(
     @Request() req,
-    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param('productId') productId: string,
     @Body() createReviewDto: CreateReviewDto,
   ) {
-    return this.reviewsService.createReview(req.user.id, productId, createReviewDto);
+    return this.reviewsService.createReview(
+      req.user.id,
+      productId,
+      createReviewDto,
+    );
   }
 
   @Get('products/:productId')
@@ -61,7 +64,7 @@ export class ReviewsController {
   })
   @ApiResponse({ status: 404, description: 'Product not found' })
   async getProductReviews(
-    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param('productId') productId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
@@ -81,10 +84,14 @@ export class ReviewsController {
   @ApiResponse({ status: 404, description: 'Review not found' })
   async updateReview(
     @Request() req,
-    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+    @Param('reviewId') reviewId: string,
     @Body() updateReviewDto: UpdateReviewDto,
   ) {
-    return this.reviewsService.updateReview(req.user.id, reviewId, updateReviewDto);
+    return this.reviewsService.updateReview(
+      req.user.id,
+      reviewId,
+      updateReviewDto,
+    );
   }
 
   @Delete(':reviewId')
@@ -97,10 +104,7 @@ export class ReviewsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Review not found' })
-  async deleteReview(
-    @Request() req,
-    @Param('reviewId', ParseUUIDPipe) reviewId: string,
-  ) {
+  async deleteReview(@Request() req, @Param('reviewId') reviewId: string) {
     return this.reviewsService.deleteReview(req.user.id, reviewId);
   }
 
@@ -137,7 +141,11 @@ export class ReviewsController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
-    return this.reviewsService.getVendorProductReviews(req.user.id, page, limit);
+    return this.reviewsService.getVendorProductReviews(
+      req.user.id,
+      page,
+      limit,
+    );
   }
 }
 
@@ -160,10 +168,14 @@ export class ProductReviewsController {
   @ApiResponse({ status: 404, description: 'Product not found' })
   async createProductReview(
     @Request() req,
-    @Param('id', ParseUUIDPipe) productId: string,
+    @Param('id') productId: string,
     @Body() createReviewDto: CreateReviewDto,
   ) {
-    return this.reviewsService.createReview(req.user.id, productId, createReviewDto);
+    return this.reviewsService.createReview(
+      req.user.id,
+      productId,
+      createReviewDto,
+    );
   }
 
   @Get(':id/reviews')
@@ -177,10 +189,10 @@ export class ProductReviewsController {
   })
   @ApiResponse({ status: 404, description: 'Product not found' })
   async getProductReviews(
-    @Param('id', ParseUUIDPipe) productId: string,
+    @Param('id') productId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
     return this.reviewsService.getProductReviews(productId, page, limit);
   }
-} 
+}
