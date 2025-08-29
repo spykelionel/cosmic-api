@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   Param,
-  ParseUUIDPipe,
   Post,
   Put,
   Request,
@@ -110,7 +109,7 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Address not found' })
   async updateAddress(
     @Request() req,
-    @Param('addressId', ParseUUIDPipe) addressId: string,
+    @Param('addressId') addressId: string,
     @Body() updateAddressDto: UpdateAddressDto,
   ) {
     return this.usersService.updateAddress(
@@ -129,10 +128,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Address not found' })
-  async removeAddress(
-    @Request() req,
-    @Param('addressId', ParseUUIDPipe) addressId: string,
-  ) {
+  async removeAddress(@Request() req, @Param('addressId') addressId: string) {
     return this.usersService.removeAddress(req.user.id, addressId);
   }
 
@@ -147,7 +143,7 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Address not found' })
   async setDefaultAddress(
     @Request() req,
-    @Param('addressId', ParseUUIDPipe) addressId: string,
+    @Param('addressId') addressId: string,
   ) {
     return this.usersService.setDefaultAddress(req.user.id, addressId);
   }
